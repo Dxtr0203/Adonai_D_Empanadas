@@ -83,7 +83,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'adonai_store',
         'USER': 'root',
-        'PASSWORD': 'Dexter704',
+        'PASSWORD': '123456',
         'HOST': 'localhost',
         'PORT': '3306',
     }
