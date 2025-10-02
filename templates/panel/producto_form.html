@@ -1,0 +1,72 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}{{ modo }} producto{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">{{ modo }} producto</h2>
+  <a href="{% url 'panel:inventario_list' %}" class="btn btn-outline-secondary">Volver</a>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate class="row g-3">
+  {% csrf_token %}
+  <div class="col-md-4">
+    <label class="form-label">Categoría *</label>
+    {{ form.categoria }}
+    {% if form.categoria.errors %}<div class="text-danger small">{{ form.categoria.errors|striptags }}</div>{% endif %}
+  </div>
+  <div class="col-md-8">
+    <label class="form-label">Nombre *</label>
+    {{ form.nombre }}
+    {% if form.nombre.errors %}<div class="text-danger small">{{ form.nombre.errors|striptags }}</div>{% endif %}
+  </div>
+  <div class="col-12">
+    <label class="form-label">Descripción</label>
+    {{ form.descripcion }}
+    {% if form.descripcion.errors %}<div class="text-danger small">{{ form.descripcion.errors|striptags }}</div>{% endif %}
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">Precio (Bs.) *</label>
+    {{ form.precio }}
+    <div class="form-text">Mínimo 0.10</div>
+    {% if form.precio.errors %}<div class="text-danger small">{{ form.precio.errors|striptags }}</div>{% endif %}
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Stock mínimo *</label>
+    {{ form.stock_minimo }}
+    {% if form.stock_minimo.errors %}<div class="text-danger small">{{ form.stock_minimo.errors|striptags }}</div>{% endif %}
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Stock actual *</label>
+    {{ form.stock_actual }}
+    {% if form.stock_actual.errors %}<div class="text-danger small">{{ form.stock_actual.errors|striptags }}</div>{% endif %}
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Imagen</label>
+    {{ form.imagen }}
+    <div class="form-text">JPG/PNG/WEBP. Máx 2MB.</div>
+    {% if form.imagen.errors %}<div class="text-danger small">{{ form.imagen.errors|striptags }}</div>{% endif %}
+  </div>
+
+  <div class="col-12">
+    <img id="preview" src="#" class="rounded d-none" style="max-height:160px; border:1px solid var(--border);" alt="Preview">
+  </div>
+
+  <div class="col-12 d-flex gap-2">
+    <button class="btn btn-primary" type="submit">Guardar</button>
+    <button class="btn btn-outline-secondary" type="reset">Limpiar</button>
+  </div>
+</form>
+
+<script>
+  const input = document.getElementById("id_imagen");
+  const preview = document.getElementById("preview");
+  if (input) {
+    input.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (!file) { preview.classList.add("d-none"); return; }
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove("d-none");
+    });
+  }
+</script>
+{% endblock %}

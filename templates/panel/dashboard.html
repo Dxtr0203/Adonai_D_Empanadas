@@ -1,0 +1,35 @@
+{% extends "panel/base_panel.html" %}
+{% block title %}Resumen{% endblock %}
+{% block content %}
+<h2 class="mb-4">Resumen</h2>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="text-muted">Productos totales</div>
+      <div class="display-6">{{ total_prod }}</div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div><strong>Alertas de stock</strong></div>
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'panel:inventario_list' %}">Ver todas</a>
+      </div>
+      <hr class="my-2">
+      {% if low_stock %}
+        <ul class="list-group list-group-flush">
+          {% for p in low_stock %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <span>{{ p.nombre }}</span>
+              <span class="badge bg-danger">Stock: {{ p.stock_actual }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-success">Sin alertas ✅</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

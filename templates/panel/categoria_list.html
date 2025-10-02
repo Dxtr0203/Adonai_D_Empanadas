@@ -1,0 +1,40 @@
+{% extends "panel/base_panel.html" %}
+
+{% block title %}Categorías | Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Categorías</h2>
+  <a href="{% url 'panel:categoria_create' %}" class="btn btn-primary">Nueva categoría</a>
+</div>
+
+{% if categorias %}
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <table class="table mb-0 align-middle">
+        <thead>
+          <tr>
+            <th style="width:80px">#</th>
+            <th>Nombre</th>
+            <th style="width:180px">Productos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in categorias %}
+            <tr>
+              <td class="text-muted">{{ forloop.counter }}</td>
+              <td>{{ c.nombre }}</td>
+              <td>
+                {{ c.producto_set.count }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-info">Aún no tienes categorías. Crea la primera 👇</div>
+  <a href="{% url 'panel:categoria_create' %}" class="btn btn-primary">Crear categoría</a>
+{% endif %}
+{% endblock %}

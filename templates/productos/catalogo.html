@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Catálogo | Adonai{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Catálogo de Productos</h1>
+  <a href="{% url 'agregar_producto' %}" class="btn btn-primary">+ Agregar</a>
+</div>
+
+<form method="get" class="card mb-4">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label">Categoría</label>
+      <select name="categoria" class="form-select">
+        <option value="">Todas</option>
+        {% for c in categorias %}
+          <option value="{{ c.id }}" {% if request.GET.categoria|default:'' == c.id|stringformat:"s" %}selected{% endif %}>
+            {{ c.nombre }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Buscar</label>
+      <input name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Nombre o descripción...">
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-outline-primary w-100">Filtrar</button>
+    </div>
+  </div>
+</form>
+
+{% if productos %}
+  <div class="row g-3">
+    {% for p in productos %}
+      <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <div class="card h-100">
+          {% if p.imagen %}
+            <img src="{{ p.imagen.url }}" class="card-img-top" style="object-fit:cover; height:180px" alt="{{ p.nombre }}">
+          {% else %}
+            <div class="bg-light d-flex align-items-center justify-content-center" style="height:180px">Sin imagen</div>
+          {% endif %}
+          <div class="card-body">
+            <h5 class="card-title mb-1">{{ p.nombre }}</h5>
+            <div class="small text-muted mb-2">{{ p.categoria.nombre }}</div>
+            <div class="fw-bold mb-2">Bs. {{ p.precio }}</div>
+            <div class="small {% if p.stock_actual <= p.stock_minimo %}text-danger{% else %}text-success{% endif %}">
+              Stock: {{ p.stock_actual }}
+            </div>
+          </div>
+          <div class="card-footer bg-white">
+            <button class="btn btn-sm btn-outline-primary w-100">Añadir al carrito</button>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info">No hay productos.</div>
+{% endif %}
+{% endblock %}

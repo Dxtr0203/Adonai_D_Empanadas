@@ -1,3 +1,6 @@
 from django.shortcuts import render
+from .models import Usuario
 
-# Create your views here.
+def perfil(request):
+    usuario = request.user
+    return render(request, 'usuarios/perfil.html', {'usuario': usuario})

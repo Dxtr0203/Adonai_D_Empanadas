@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Agregar Producto | Adonai{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h1 class="h3 mb-0">Agregar Producto</h1>
+          <a href="{% url 'catalogo' %}" class="btn btn-outline-secondary">← Volver al Catálogo</a>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" novalidate id="producto-form" class="needs-validation">
+          {% csrf_token %}
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label required">Categoría</label>
+              {{ form.categoria }}
+              {% for e in form.categoria.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required">Nombre</label>
+              {{ form.nombre }}
+              {% for e in form.nombre.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Descripción</label>
+              {{ form.descripcion }}
+              {% for e in form.descripcion.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label required">Precio (Bs.)</label>
+              {{ form.precio }}
+              {% for e in form.precio.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label required">Stock mínimo</label>
+              {{ form.stock_minimo }}
+              {% for e in form.stock_minimo.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label required">Stock actual</label>
+              {{ form.stock_actual }}
+              {% for e in form.stock_actual.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label">Imagen</label>
+              {{ form.imagen }}
+              <div class="form-text">Formatos: JPG/PNG. Peso sugerido < 2MB.</div>
+              {% for e in form.imagen.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Previsualización</label>
+              <div class="border rounded p-2 text-center bg-light">
+                <img id="preview" src="" alt="Vista previa" style="max-width:100%; max-height:160px; display:none;">
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 mt-4">
+            <button class="btn btn-primary" type="submit">Guardar</button>
+            <button class="btn btn-outline-secondary" type="reset">Limpiar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Bootstrap client-side validation
+  (()=> {
+    const form = document.getElementById('producto-form');
+    form.addEventListener('submit', function (e) {
+      if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
+      form.classList.add('was-validated');
+    }, false);
+
+  // Image preview
+  const inputImg = document.getElementById("id_imagen");
+  const preview = document.getElementById("preview");
+  if (inputImg) {
+    inputImg.addEventListener("change", () => {
+      const file = inputImg.files[0];
+      if (!file) { preview.style.display="none"; preview.src=""; return; }
+      const reader = new FileReader();
+      reader.onload = e => { preview.src = e.target.result; preview.style.display="block"; };
+      reader.readAsDataURL(file);
+    });
+  }
+</script>
+{% endblock %}
