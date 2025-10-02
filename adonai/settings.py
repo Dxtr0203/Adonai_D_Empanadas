@@ -48,6 +48,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'usuarios.middleware.LoadUsuarioMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -83,7 +84,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'adonai_store',
         'USER': 'root',
-        'PASSWORD': 'Dexter704',
+        'PASSWORD': 'acigam160',
         'HOST': 'localhost',
         'PORT': '3306',
     }
