@@ -23,7 +23,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Utilidades
-    'django.contrib.humanize',  # para formatear números/precios en templates
+    'django.contrib.humanize',  # formateo de números/precios en templates
 
     # Apps del proyecto
     'usuarios',
@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'carrito',
     'delivery',
     'chat',
+    'core',
 ]
 
 # === Middleware ===
@@ -52,7 +53,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / 'templates',              # p.ej. /templates/base.html (cliente)
+            BASE_DIR / 'templates',              # /templates/base.html, etc.
             BASE_DIR / 'adonai' / 'templates',   # si mantienes templates dentro del proyecto
         ],
         'APP_DIRS': True,  # también busca en app/templates/
@@ -80,7 +81,7 @@ DATABASES = {
     }
 }
 
-# === Password validation ===
+# === Validación de contraseñas ===
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -89,35 +90,30 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # === Internacionalización ===
-LANGUAGE_CODE = 'es'                 # interfaz en español
-TIME_ZONE = 'America/La_Paz'         # hora local
+LANGUAGE_CODE = 'es'
+TIME_ZONE = 'America/La_Paz'
 USE_I18N = True
 USE_TZ = True
 
-# === Archivos estáticos y media ===
-# Static (CSS/JS/imagenes estáticas del front)
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',             # tu carpeta /static (desarrollo)
-]
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # para collectstatic en producción
+# === Archivos estáticos (CSS/JS/imagenes del front) ===
+STATIC_URL = "/static/"
 
-# Media (archivos subidos por usuarios: imágenes de productos)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'  # Asegúrate de que esta ruta exista en tu proyecto
+# Carpeta de estáticos para desarrollo (archivos que TÚ pones en /static)
+STATICFILES_DIRS = [
+    BASE_DIR / "static",   # ej: /static/img/hero-pets.jpg
+]
+
+# Carpeta destino para collectstatic (producción)
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# === Archivos de media (subidos por usuarios) ===
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"     # ej: /media/productos/imagen.jpg
 
 # === Autenticación y login multi-rol ===
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/panel/"   # al iniciar sesión, admin/empleado van al panel
-LOGOUT_REDIRECT_URL = "/"        # al cerrar sesión, vuelve a la tienda
+LOGIN_REDIRECT_URL = "/panel/"
+LOGOUT_REDIRECT_URL = "/"
 
 # === Clave primaria por defecto ===
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# === Archivos subidos por usuarios (media) ===
-# Asegúrate de que Django pueda manejar la carga de archivos correctamente.
-# En el entorno de desarrollo, Django usará estas rutas para almacenar imágenes y otros archivos cargados por los usuarios.
-
-# Aquí estamos indicando que los archivos como imágenes subidos estarán en el directorio 'media'
-# Los archivos estarán disponibles en la URL /media/ por lo que, en producción, deberás configurar
-# tu servidor web (nginx, apache) para servirlos adecuadamente.

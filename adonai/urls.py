@@ -4,19 +4,21 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    # Ruta para el panel de administración de Django
+    # Panel de administración de Django
     path("admin/", admin.site.urls),
 
-    # Sitio público (catálogo de productos)
-    path("", include("productos.urls")),  # Incluye las URLs de la aplicación 'productos' para el catálogo público
+    # Sitio público (inicio y catálogo)
+    path("", include("core.urls")),             # Portada e info de la tienda
+    path("catalogo/", include("productos.urls")),  # Catálogo público
 
-    # Panel interno (administración de inventario)
-    path("panel/", include("productos.panel_urls")),  # Incluye las URLs para el panel de administración de inventarios y otras configuraciones internas
+    # Panel interno (inventario, administración)
+    path("panel/", include("productos.panel_urls")),
 
-    # Rutas de autenticación y gestión de usuarios
-    path("accounts/", include("usuarios.urls")),  # Incluye las URLs de la aplicación 'usuarios' para autenticación y gestión de usuarios
+    # Autenticación y gestión de usuarios
+    path("accounts/", include("usuarios.urls")),
 ]
 
-# Si estamos en modo DEBUG, servir archivos estáticos y de medios
+# En desarrollo, servir archivos de media y estáticos
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
