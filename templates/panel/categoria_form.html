@@ -1,0 +1,44 @@
+{% extends "panel/base_panel.html" %}
+
+{% block title %}Nueva Categoría | Panel{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Nueva Categoría</h2>
+
+<form method="post" novalidate class="card shadow-sm">
+  <div class="card-body">
+    {% csrf_token %}
+
+    {# errores no-campo #}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div class="mb-3">
+      <label class="form-label">Nombre</label>
+      <input
+        type="text"
+        name="{{ form.nombre.name }}"
+        value="{{ form.nombre.value|default_if_none:'' }}"
+        class="form-control {% if form.nombre.errors %}is-invalid{% endif %}"
+        placeholder="Ej. Empanadas"
+        required
+      >
+      {% if form.nombre.errors %}
+        <div class="invalid-feedback">
+          {{ form.nombre.errors|striptags }}
+        </div>
+      {% else %}
+        <div class="form-text">Obligatorio. 2–50 caracteres.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card-footer d-flex gap-2">
+    <a href="{% url 'panel:categoria_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+    <button class="btn btn-primary" type="submit">Guardar</button>
+  </div>
+</form>
+{% endblock %}

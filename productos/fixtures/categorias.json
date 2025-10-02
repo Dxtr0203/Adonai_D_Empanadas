@@ -1,0 +1,110 @@
+[
+    {
+        "model": "productos.categoria",
+        "pk": 1,
+        "fields": {
+            "nombre": "Alimentación",
+            "descripcion": "Alimentos para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 2,
+        "fields": {
+            "nombre": "Snacks y Premios",
+            "descripcion": "Snacks y premios para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 3,
+        "fields": {
+            "nombre": "Higiene y Cuidado",
+            "descripcion": "Productos de higiene y cuidado",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 4,
+        "fields": {
+            "nombre": "Accesorios",
+            "descripcion": "Accesorios varios para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 5,
+        "fields": {
+            "nombre": "Juguetes",
+            "descripcion": "Juguetes para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 6,
+        "fields": {
+            "nombre": "Camas y Hogar",
+            "descripcion": "Camas y muebles para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 7,
+        "fields": {
+            "nombre": "Ropa y Estilo",
+            "descripcion": "Ropa y accesorios de estilo para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 8,
+        "fields": {
+            "nombre": "Salud y Bienestar",
+            "descripcion": "Productos de salud y bienestar para mascotas",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 9,
+        "fields": {
+            "nombre": "Ofertas / Promociones",
+            "descripcion": "Ofertas y promociones en productos",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 10,
+        "fields": {
+            "nombre": "Perros",
+            "descripcion": "Productos para perros",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 11,
+        "fields": {
+            "nombre": "Gatos",
+            "descripcion": "Productos para gatos",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    },
+    {
+        "model": "productos.categoria",
+        "pk": 12,
+        "fields": {
+            "nombre": "Hámsters",
+            "descripcion": "Productos para hámsters",
+            "creado_en": "2025-10-02T12:00:00"
+        }
+    }
+]

@@ -1,22 +1,22 @@
-"""
-URL configuration for adonai project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Ruta para el panel de administración de Django
+    path("admin/", admin.site.urls),
+
+    # Sitio público (catálogo de productos)
+    path("", include("productos.urls")),  # Incluye las URLs de la aplicación 'productos' para el catálogo público
+
+    # Panel interno (administración de inventario)
+    path("panel/", include("productos.panel_urls")),  # Incluye las URLs para el panel de administración de inventarios y otras configuraciones internas
+
+    # Rutas de autenticación y gestión de usuarios
+    path("accounts/", include("usuarios.urls")),  # Incluye las URLs de la aplicación 'usuarios' para autenticación y gestión de usuarios
 ]
+
+# Si estamos en modo DEBUG, servir archivos estáticos y de medios
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
