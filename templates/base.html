@@ -1,4 +1,3 @@
-<!-- templates/base.html -->
 {% load static %}
 <!doctype html>
 <html lang="es">
@@ -49,11 +48,7 @@
             <i class="bi bi-house-door d-lg-none me-1"></i> Inicio
           </a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.path|slice:':10' == '/catalogo/' %}active{% endif %}" href="{% url 'catalogo' %}">
-            <i class="bi bi-bag d-lg-none me-1"></i> Catálogo
-          </a>
-        </li>
+      
       </ul>
 
       <div class="d-none d-lg-flex ms-3 gap-2">
@@ -61,12 +56,9 @@
           <i class="bi bi-bag"></i> Catálogo
         </a>
 
-        <!-- Enlaces seguros con fallback: si la URL no existe, usa "#" -->
-        {% url 'agregar_producto' as url_agregar_producto %}
-        <a href="{{ url_agregar_producto|default:'#' }}" class="btn btn-primary btn-sm" {% if not url_agregar_producto %}rel="nofollow"{% endif %}>
-          <i class="bi bi-plus-lg"></i> Producto
-        </a>
-
+        <!-- Eliminar el botón "+ Agregar Producto" -->
+        <!-- El botón de agregar producto ya fue eliminado -->
+        
         {% url 'carrito' as url_carrito %}
         <a href="{{ url_carrito|default:'#' }}" class="btn btn-outline-secondary btn-sm" {% if not url_carrito %}rel="nofollow"{% endif %}>
           <i class="bi bi-cart"></i> Carrito
@@ -94,7 +86,7 @@
 
 <footer class="bg-white border-top mt-5">
   <div class="container py-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-    <span class="text-secondary">© {{ now|date:"Y" }} Adonai Pet Shop — Santa Cruz, Bolivia</span>
+    <span class="text-secondary">© {{ now|date:"Y" }} Adonai Pet Shop — La Paz, Bolivia</span>
     <div class="d-flex gap-3">
       <a href="#" aria-label="Facebook Adonai"><i class="bi bi-facebook fs-5"></i></a>
       <a href="#" aria-label="Instagram Adonai"><i class="bi bi-instagram fs-5"></i></a>

@@ -17,10 +17,13 @@ class Producto(models.Model):
     stock_minimo = models.IntegerField(default=0)
     stock_actual = models.IntegerField(default=0)
     estado = models.CharField(max_length=10, choices=(('activo','activo'),('inactivo','inactivo')), default='activo')
-    # Cambiar CharField a ImageField
+    
+    # Cambiar CharField a ImageField para manejar imágenes de productos
     imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
+    
     creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_creados')
     actualizado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_actualizados')
+    
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 

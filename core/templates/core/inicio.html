@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Inicio | Adonai{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-6">
+      <h1 class="display-6 fw-bold mb-3">Bienvenido a Adonai Pet Shop</h1>
+      <p class="lead text-secondary">
+        En Adonai, te ofrecemos lo mejor para tu mejor amigo: alimentos, juguetes, higiene, y más. Disfruta de nuestro servicio de delivery en La Paz.
+      </p>
+      <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'catalogo' %}" class="btn btn-primary btn-lg">
+          <i class="bi bi-bag-heart me-2"></i> Ver catálogo
+        </a>
+        <a href="https://wa.me/qr/7EO6S4QUAKTUJ1" class="btn btn-outline-success btn-lg">
+          <i class="bi bi-whatsapp me-2"></i> Contáctanos por WhatsApp
+        </a>
+      </div>
+      <div class="text-secondary small mt-3">
+        <i class="bi bi-truck me-1"></i> Delivery el mismo día
+        · <i class="bi bi-shield-check me-1"></i> Pago seguro
+        · <i class="bi bi-geo-alt me-1"></i> La Paz - Bolivia
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <img src="{% static 'img/hero-pets.png' %}" class="w-100 rounded-4 shadow" alt="Adonai Pet Shop" style="object-fit: cover;">
+    </div>
+  </div>
+</div>
+
+<!-- Sección Misión y Visión -->
+<div class="container py-5">
+  <div class="row">
+    <!-- Misión -->
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow-sm h-100 border-0">
+        <div class="card-body">
+          <h3 class="card-title text-center text-primary">Nuestra Misión</h3>
+          <p class="lead text-muted text-center">
+            Brindar productos y servicios de alta calidad para el cuidado y bienestar de las mascotas, proporcionando un ambiente donde los dueños de mascotas puedan encontrar todo lo necesario para sus fieles compañeros.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visión -->
+    <div class="col-lg-6 mb-4">
+      <div class="card shadow-sm h-100 border-0">
+        <div class="card-body">
+          <h3 class="card-title text-center text-primary">Nuestra Visión</h3>
+          <p class="lead text-muted text-center">
+            Convertirnos en la tienda líder en Bolivia en productos y servicios para mascotas, ofreciendo un excelente servicio al cliente y una experiencia de compra única para cada dueño de mascota.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Servicios Destacados -->
+<div class="container py-5">
+  <h2 class="display-6 fw-bold text-center mb-4">Nuestros Servicios</h2>
+  <div class="row row-cols-1 row-cols-md-3 g-4">
+    <div class="col">
+      <div class="card shadow-sm h-100">
+        <img src="{% static 'img/food-service.jpg' %}" class="card-img-top" alt="Alimentos para Mascotas">
+        <div class="card-body">
+          <h5 class="card-title">Alimentos para Mascotas</h5>
+          <p class="card-text">Encuentra los mejores alimentos para perros, gatos y otras mascotas. Marcas de confianza con los nutrientes necesarios para su salud.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card shadow-sm h-100">
+        <img src="{% static 'img/toys-service.jpg' %}" class="card-img-top" alt="Juguetes para Mascotas">
+        <div class="card-body">
+          <h5 class="card-title">Juguetes para Mascotas</h5>
+          <p class="card-text">Juguetes divertidos y seguros para el entretenimiento de tu mascota. Estimula su mente y manténlos activos.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card shadow-sm h-100">
+        <img src="{% static 'img/hygiene-service.jpg' %}" class="card-img-top" alt="Higiene para Mascotas">
+        <div class="card-body">
+          <h5 class="card-title">Productos de Higiene</h5>
+          <p class="card-text">Ofrecemos productos para el cuidado y limpieza de tu mascota, desde champús hasta accesorios para baño y salud.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

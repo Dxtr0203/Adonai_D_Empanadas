@@ -12,6 +12,16 @@
           <a href="{% url 'catalogo' %}" class="btn btn-outline-secondary">← Volver al Catálogo</a>
         </div>
 
+        <!-- Mostrar mensajes de éxito y error -->
+        {% if messages %}
+          <div class="alert alert-dismissible fade show" role="alert">
+            {% for message in messages %}
+              <p>{{ message }}</p>
+            {% endfor %}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endif %}
+
         <form method="post" enctype="multipart/form-data" novalidate id="producto-form" class="needs-validation">
           {% csrf_token %}
 
@@ -77,24 +87,35 @@
 {% block extra_js %}
 <script>
   // Bootstrap client-side validation
-  (()=> {
+  (() => {
     const form = document.getElementById('producto-form');
     form.addEventListener('submit', function (e) {
-      if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       form.classList.add('was-validated');
     }, false);
 
-  // Image preview
-  const inputImg = document.getElementById("id_imagen");
-  const preview = document.getElementById("preview");
-  if (inputImg) {
-    inputImg.addEventListener("change", () => {
-      const file = inputImg.files[0];
-      if (!file) { preview.style.display="none"; preview.src=""; return; }
-      const reader = new FileReader();
-      reader.onload = e => { preview.src = e.target.result; preview.style.display="block"; };
-      reader.readAsDataURL(file);
-    });
-  }
+    // Image preview
+    const inputImg = document.getElementById("id_imagen");
+    const preview = document.getElementById("preview");
+    if (inputImg) {
+      inputImg.addEventListener("change", () => {
+        const file = inputImg.files[0];
+        if (!file) {
+          preview.style.display = "none";
+          preview.src = "";
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          preview.src = e.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  })();
 </script>
 {% endblock %}

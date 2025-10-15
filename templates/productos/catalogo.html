@@ -4,9 +4,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0">Catálogo de Productos</h1>
-  <a href="{% url 'agregar_producto' %}" class="btn btn-primary">+ Agregar</a>
+
+  <!-- Icono del carrito -->
+  <button id="cart-icon" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#cart-modal">
+    <i class="bi bi-cart"></i> Carrito (<span id="cart-count">0</span>)
+  </button>
 </div>
 
+<!-- Filtro de búsqueda -->
 <form method="get" class="card mb-4">
   <div class="card-body row g-2 align-items-end">
     <div class="col-md-4">
@@ -30,11 +35,12 @@
   </div>
 </form>
 
+<!-- Mostrar Productos -->
 {% if productos %}
   <div class="row g-3">
     {% for p in productos %}
       <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-        <div class="card h-100">
+        <div class="card h-100 product-card">
           {% if p.imagen %}
             <img src="{{ p.imagen.url }}" class="card-img-top" style="object-fit:cover; height:180px" alt="{{ p.nombre }}">
           {% else %}
@@ -49,13 +55,145 @@
             </div>
           </div>
           <div class="card-footer bg-white">
-            <button class="btn btn-sm btn-outline-primary w-100">Añadir al carrito</button>
+            <button class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#productModal{{ p.id }}">Ver Detalles</button>
+            <input type="number" id="quantity-{{ p.id }}" class="form-control mb-2" min="1" value="1">
+            <button class="btn btn-sm btn-outline-primary w-100" onclick="addToCart({{ p.id }}, '{{ p.nombre }}', '{{ p.precio }}', document.getElementById('quantity-{{ p.id }}').value)">Añadir al carrito</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Detalles del Producto -->
+      <div class="modal fade" id="productModal{{ p.id }}" tabindex="-1" aria-labelledby="productModalLabel{{ p.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="productModalLabel{{ p.id }}">{{ p.nombre }}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              {% if p.imagen %}
+                <img src="{{ p.imagen.url }}" class="img-fluid" alt="{{ p.nombre }}">
+              {% endif %}
+              <p><strong>Categoría:</strong> {{ p.categoria.nombre }}</p>
+              <p><strong>Descripción:</strong> {{ p.descripcion }}</p>
+              <p><strong>Precio:</strong> Bs. {{ p.precio }}</p>
+              <p><strong>Stock Actual:</strong> {{ p.stock_actual }}</p>
+              <p><strong>Stock Mínimo:</strong> {{ p.stock_minimo }}</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+              <input type="number" id="quantity-{{ p.id }}-modal" class="form-control" min="1" value="1">
+              <button type="button" class="btn btn-primary" onclick="addToCart({{ p.id }}, '{{ p.nombre }}', '{{ p.precio }}', document.getElementById('quantity-{{ p.id }}-modal').value)">Añadir al carrito</button>
+            </div>
           </div>
         </div>
       </div>
     {% endfor %}
   </div>
 {% else %}
-  <div class="alert alert-info">No hay productos.</div>
+  <div class="alert alert-info">No hay productos que coincidan con los filtros seleccionados.</div>
 {% endif %}
+
+<!-- Carrito Modal -->
+<div class="modal fade" id="cart-modal" tabindex="-1" aria-labelledby="cart-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cart-modal-label">Carrito de Compras</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="cart-items">
+        <!-- Los productos del carrito se mostrarán aquí -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary">Ir a pagar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Función para agregar productos al carrito
+let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+// Función para agregar un producto al carrito
+function addToCart(productId, productName, productPrice, quantity) {
+  quantity = parseInt(quantity);  // Asegurarse que la cantidad sea un número entero
+
+  const product = {
+    id: productId,
+    nombre: productName,
+    precio: productPrice,
+    cantidad: quantity
+  };
+
+  // Verifica si el producto ya está en el carrito
+  const existingProduct = cart.find(item => item.id === productId);
+  if (existingProduct) {
+    existingProduct.cantidad += quantity;  // Si ya está, incrementa la cantidad
+  } else {
+    cart.push(product);
+  }
+
+  // Guarda el carrito en localStorage
+  localStorage.setItem('cart', JSON.stringify(cart));
+
+  // Actualiza el contador del carrito
+  document.getElementById('cart-count').innerText = cart.length;
+
+  alert("Producto añadido al carrito");
+  console.log(cart);  // Esto solo para depuración
+}
+
+// Función para mostrar el carrito
+function showCart() {
+  const cartItems = document.getElementById("cart-items");
+  cartItems.innerHTML = ''; // Limpiar el contenido actual del carrito
+
+  if (cart.length === 0) {
+    cartItems.innerHTML = '<p>No hay productos en el carrito.</p>';
+  } else {
+    cart.forEach(item => {
+      const productDiv = document.createElement('div');
+      productDiv.classList.add('cart-item');
+      productDiv.innerHTML = `
+        <p>${item.nombre} - Bs. ${item.precio} x 
+          <input type="number" class="quantity" value="${item.cantidad}" min="1" onchange="updateQuantity(${item.id}, this.value)">
+        </p>
+        <button onclick="removeFromCart(${item.id})">Eliminar</button>
+      `;
+      cartItems.appendChild(productDiv);
+    });
+  }
+}
+
+// Función para actualizar la cantidad en el carrito
+function updateQuantity(productId, newQuantity) {
+  const product = cart.find(item => item.id === productId);
+  if (product) {
+    product.cantidad = parseInt(newQuantity);
+    localStorage.setItem('cart', JSON.stringify(cart));
+    showCart();  // Actualizar la vista del carrito
+  }
+}
+
+// Función para eliminar productos del carrito
+function removeFromCart(productId) {
+  cart = cart.filter(item => item.id !== productId);
+  localStorage.setItem('cart', JSON.stringify(cart));
+  showCart();
+}
+
+// Mostrar carrito cuando se hace clic en el icono del carrito
+document.getElementById('cart-icon').addEventListener('click', function() {
+  showCart();
+});
+
+// Mostrar el carrito en el modal
+$('#cart-modal').on('shown.bs.modal', function () {
+  showCart();
+});
+</script>
+
 {% endblock %}

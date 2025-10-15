@@ -1,7 +1,3 @@
-"""
-Django settings for adonai project.
-"""
-
 from pathlib import Path
 import os
 
@@ -10,8 +6,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # === Seguridad / Debug (solo dev) ===
 SECRET_KEY = 'django-insecure-kfxcl-@8q4l=r8!c-)rb20w+cp&&8m&suw-$c^1=^fo+ar47)-'
-DEBUG = True
-ALLOWED_HOSTS = []
+DEBUG = True  # Cambiar a False en producción
+ALLOWED_HOSTS = []  # Aquí puedes agregar los dominios permitidos cuando esté en producción
 
 # === Apps ===
 INSTALLED_APPS = [
@@ -21,11 +17,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # Utilidades para formatear números/precios
 
-    # Utilidades
-    'django.contrib.humanize',  # formateo de números/precios en templates
-
-    # Apps del proyecto
+    # Apps personalizadas del proyecto
     'usuarios',
     'productos.apps.ProductosConfig',
     'ventas',
@@ -33,6 +27,7 @@ INSTALLED_APPS = [
     'delivery',
     'chat',
     'core',
+    'roles',  # Agregar la app de roles
 ]
 
 # === Middleware ===
@@ -44,6 +39,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'usuarios.middleware.LoginAttemptsMiddleware',  # Agregar el middleware personalizado para bloqueo de intentos
 ]
 
 ROOT_URLCONF = 'adonai.urls'
@@ -53,10 +49,10 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / 'templates',              # /templates/base.html, etc.
-            BASE_DIR / 'adonai' / 'templates',   # si mantienes templates dentro del proyecto
+            BASE_DIR / 'templates',              # Carpeta global para templates
+            BASE_DIR / 'adonai' / 'templates',   # Plantillas dentro del proyecto (si las tienes)
         ],
-        'APP_DIRS': True,  # también busca en app/templates/
+        'APP_DIRS': True,  # Permite buscar templates dentro de cada app
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
@@ -73,9 +69,9 @@ WSGI_APPLICATION = 'adonai.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'adonai_store',
-        'USER': 'root',
-        'PASSWORD': '123456',
+        'NAME': 'adonai_store',  # Nombre de la base de datos
+        'USER': 'root',  # Usuario para la base de datos
+        'PASSWORD': '123456',  # Contraseña de la base de datos
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -98,9 +94,9 @@ USE_TZ = True
 # === Archivos estáticos (CSS/JS/imagenes del front) ===
 STATIC_URL = "/static/"
 
-# Carpeta de estáticos para desarrollo (archivos que TÚ pones en /static)
+# Carpeta de archivos estáticos para desarrollo (archivos que TÚ pones en /static)
 STATICFILES_DIRS = [
-    BASE_DIR / "static",   # ej: /static/img/hero-pets.jpg
+    BASE_DIR / "static",   # Ruta para archivos estáticos adicionales
 ]
 
 # Carpeta destino para collectstatic (producción)
@@ -108,12 +104,27 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # === Archivos de media (subidos por usuarios) ===
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"     # ej: /media/productos/imagen.jpg
+MEDIA_ROOT = BASE_DIR / "media"     # Ruta para los archivos subidos por usuarios
 
 # === Autenticación y login multi-rol ===
-LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/panel/"
-LOGOUT_REDIRECT_URL = "/"
+LOGIN_URL = '/usuarios/login/'  # Ruta para acceder al login
+LOGIN_REDIRECT_URL = "/panel/"  # Redirigir después de login, a la página principal del panel
+LOGOUT_REDIRECT_URL = "/"  # Redirigir después de logout a la página de inicio
 
-# === Clave primaria por defecto ===
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# === Configuración de Autenticación ===
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # Autenticación por defecto
+]
+
+# --- Configuración adicional de seguridad ---
+SECURE_SSL_REDIRECT = False  # En desarrollo, debe estar en False. En producción, ponlo en True si usas HTTPS
+CSRF_COOKIE_SECURE = False  # En desarrollo, debe estar en False. En producción, ponlo en True si usas HTTPS
+SESSION_COOKIE_SECURE = False  # En desarrollo, debe estar en False. En producción, ponlo en True si usas HTTPS
+
+# --- Bloqueo de intentos fallidos (opcional) --- 
+# Implementar un bloqueo de 30 segundos después de 3 intentos fallidos
+LOGIN_FAILURE_LIMIT = 3  # Número de intentos fallidos
+LOGIN_BLOCK_TIME = 30  # Tiempo de bloqueo en segundos
+
+# --- Otras configuraciones ---
+SESSION_COOKIE_AGE = 86400  # La sesión expirará después de 24 horas (en segundos)
