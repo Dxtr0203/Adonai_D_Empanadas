@@ -1,0 +1,16 @@
+[33m27676b3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mannie[m[33m)[m Guardando cambios antes de cambiar a la rama main
+[33m2fdbbd7[m interfaz
+[33m22fba3b[m interfaz
+[33m662f829[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m, [m[1;32mchat[m[33m)[m Primer commit del proyecto
+[33mf231659[m Merge pull request #8 from Dxtr0203/anita
+[33m5c30aef[m[33m ([m[1;31morigin/anita[m[33m, [m[1;32manita[m[33m)[m Avances: catálogo con filtros, UI mejorada y modal de producto
+[33m2bd72e1[m Merge pull request #6 from Dxtr0203/DexterChatbot
+[33mf587223[m Merge pull request #5 from Dxtr0203/main
+[33m7b5336c[m Merge pull request #4 from Dxtr0203/Dexter
+[33mf44830c[m[33m ([m[1;31morigin/Dexter[m[33m)[m Merge pull request #3 from Dxtr0203/main
+[33mfec58d0[m[33m ([m[1;31morigin/Valery[m[33m)[m Merge pull request #1 from Dxtr0203/Dexter
+[33m3fe47d8[m Prueba de subida de edicion de archivos
+[33m4784311[m Prueba
+[33mc7a76bf[m Agregar requirements.txt con dependencias
+[33m8677f67[m[33m ([m[1;31morigin/ramita[m[33m)[m Primer commit - proyecto Django Adonai
+[33m93a1145[m Agregar .gitignore para Django
