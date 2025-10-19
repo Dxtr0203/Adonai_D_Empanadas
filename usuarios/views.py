@@ -120,7 +120,8 @@ def custom_login(request):
     return render(request, 'usuarios/login.html')  # Vuelve a mostrar el formulario de login
 
 
-@login_required  # Asegura que solo los usuarios autenticados puedan acceder
+# Vista para el perfil del usuario (requiere autenticación)
+@login_required
 def perfil(request):
     usuario = request.user  # Obtiene el usuario autenticado
 

@@ -1,4 +1,3 @@
-# usuarios/forms.py
 from django import forms
 from .models import Usuario  # Asegúrate de que 'Usuario' sea el modelo correcto para los usuarios
 from django.contrib.auth.forms import AuthenticationForm
@@ -17,5 +16,32 @@ class LowercaseAuthenticationForm(AuthenticationForm):
 
 class UsuarioForm(forms.ModelForm):
     class Meta:
-        model = Usuario  # El modelo de usuario
-        fields = ['nombre', 'email', 'telefono', 'direccion']  # Los campos que el usuario puede editar
+        model = Usuario
+        fields = ['nombre', 'email', 'telefono', 'direccion']  # Los campos del modelo Usuario que pueden ser editados
+
+class RegistroFormulario(forms.ModelForm):
+    password1 = forms.CharField(widget=forms.PasswordInput, label="Contraseña")
+    password2 = forms.CharField(widget=forms.PasswordInput, label="Confirmar Contraseña")
+
+    class Meta:
+        model = Usuario
+        fields = ['nombre', 'email', 'telefono', 'direccion']  # Asegúrate de que estos sean los campos que deseas
+
+    def clean_password2(self):
+        """
+        Verifica que las contraseñas coincidan.
+        """
+        cd = self.cleaned_data
+        if cd['password1'] != cd['password2']:
+            raise forms.ValidationError("Las contraseñas no coinciden.")
+        return cd['password2']
+
+    def save(self, commit=True):
+        """
+        Guarda el usuario con la contraseña de forma segura.
+        """
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data['password1'])  # Establece la contraseña de forma segura
+        if commit:
+            user.save()  # Guarda el objeto Usuario en la base de datos
+        return user
