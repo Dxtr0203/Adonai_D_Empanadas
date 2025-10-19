@@ -19,6 +19,8 @@ urlpatterns = [
 
     # Autenticación y gestión de usuarios (login, logout, etc.)
     path('usuarios/', include('usuarios.urls')),
+    # Endpoints del chat (widget)
+    path('chat/', include('chat.urls')),
 
 ]
 

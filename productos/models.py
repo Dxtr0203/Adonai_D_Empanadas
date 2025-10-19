@@ -9,6 +9,11 @@ class Categoria(models.Model):
     def __str__(self):
         return self.nombre
 
+    class Meta:
+        db_table = 'categorias'
+        # managed=False para indicar que la tabla ya existe en la base legacy
+        managed = False
+
 class Producto(models.Model):
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
     nombre = models.CharField(max_length=100)
@@ -21,14 +26,18 @@ class Producto(models.Model):
     # Cambiar CharField a ImageField para manejar imágenes de productos
     imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
     
-    creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_creados')
-    actualizado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_actualizados')
+    creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_creados', db_column='creado_por')
+    actualizado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_actualizados', db_column='actualizado_por')
     
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.nombre
+
+    class Meta:
+        db_table = 'productos'
+        managed = False
 
 class Inventario(models.Model):
     TIPO_MOVIMIENTO = (
