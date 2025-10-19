@@ -1,0 +1,14 @@
+{% extends 'panel/empleado_base.html' %}
+{% block title %}Panel Empleado{% endblock %}
+{% block content %}
+<h3>Bienvenido, {{ request.user.username }}</h3>
+<p>Total de productos: {{ total_productos }}</p>
+<h5>Productos con bajo stock</h5>
+<ul>
+  {% for p in low_stock %}
+    <li>{{ p.nombre }} - stock: {{ p.stock_actual }}</li>
+  {% empty %}
+    <li>No hay productos con bajo stock.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

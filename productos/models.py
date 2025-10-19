@@ -43,3 +43,28 @@ class Inventario(models.Model):
     referencia = models.CharField(max_length=100, blank=True, null=True)
     usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True)
     fecha_movimiento = models.DateTimeField(auto_now_add=True)
+
+
+# Notificaciones por producto nuevo
+class Notification(models.Model):
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notif: {self.producto.nombre} - {self.creado_en}"
+
+
+class NotificationRead(models.Model):
+    notification = models.ForeignKey(Notification, on_delete=models.CASCADE, related_name='reads')
+    # usamos auth.User para llevar el estado por usuario
+    from django.contrib.auth.models import User
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('notification', 'user')
+
+
+# Crear notificación automáticamente al crear un producto
+# Note: signal to auto-create Notification on Producto creation was removed to revert
+# to the previous UX (notifications are shown from the `ultimos` endpoint).

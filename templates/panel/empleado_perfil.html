@@ -1,0 +1,8 @@
+{% extends 'panel/empleado_base.html' %}
+{% block title %}Mi perfil - Empleado{% endblock %}
+{% block content %}
+<h3>Mi Perfil</h3>
+<p>Usuario: {{ request.user.username }}</p>
+<p>Email: {{ request.user.email }}</p>
+<a href="{% url 'usuarios:perfil' %}">Editar perfil</a>
+{% endblock %}

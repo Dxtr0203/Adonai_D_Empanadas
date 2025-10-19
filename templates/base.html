@@ -30,9 +30,8 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
   <div class="container">
-    <a class="navbar-brand" href="{% url 'inicio' %}">
-      <img src="{% static 'img/logo.png' %}" alt="Adonai"
-           onerror="this.onerror=null;this.src='{% static 'img/logo.png' %}';">
+   <a class="navbar-brand" href="{% url 'inicio' %}">
+  <img src="{% static 'img/logo.png' %}" alt="Adonai">
       Adonai
     </a>
 
@@ -51,7 +50,17 @@
       
       </ul>
 
-      <div class="d-none d-lg-flex ms-3 gap-2">
+      <div class="d-none d-lg-flex ms-3 gap-2 align-items-center">
+        <!-- Notification bell -->
+        <div id="notif-bell" class="position-relative me-2">
+          <button id="bell-btn" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-bell"></i>
+          </button>
+          <span id="bell-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+        </div>
+        <a href="{% url 'usuarios:register' %}" class="btn btn-outline-success btn-sm">
+          <i class="bi bi-person-plus"></i> Registrarse
+        </a>
         <a href="{% url 'catalogo' %}" class="btn btn-outline-primary btn-sm {% if request.path|slice:':10' == '/catalogo/' %}active{% endif %}">
           <i class="bi bi-bag"></i> Catálogo
         </a>
@@ -97,5 +106,102 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 {% block extra_js %}{% endblock %}
+
+<script>
+// Polling simple para notificaciones de productos nuevos
+async function fetchLatestProducts() {
+  try {
+    // Usamos el endpoint de notificaciones no leídas para poblar el contador
+    const res = await fetch('/catalogo/notificaciones/');
+    if (!res.ok) {
+      // Si no está autenticado o hay error, ocultamos el contador
+      document.getElementById('bell-count').style.display = 'none';
+      return;
+    }
+    const data = await res.json();
+    const count = (data.unread && data.unread.length) || 0;
+    const bellCount = document.getElementById('bell-count');
+    if (count > 0) {
+      bellCount.style.display = 'inline-block';
+      bellCount.textContent = count;
+    } else {
+      bellCount.style.display = 'none';
+    }
+    // Guardar los últimos no leídos en una variable global por si se necesita
+    window._unreadNotifs = data.unread || [];
+  } catch (e) {
+    console.error('Error fetching notifications', e);
+  }
+}
+
+// Inicia polling cada 15 segundos
+setInterval(fetchLatestProducts, 15000);
+// Llamada inicial
+fetchLatestProducts();
+
+// Bell dropdown: al hacer clic mostramos la lista de últimos productos
+document.getElementById('bell-btn').addEventListener('click', function (e) {
+  e.preventDefault();
+  let dropdown = document.getElementById('bell-dropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'bell-dropdown';
+    dropdown.className = 'card p-2 position-absolute';
+    dropdown.style.right = '0';
+    dropdown.style.top = '40px';
+    dropdown.style.minWidth = '240px';
+    dropdown.style.zIndex = 2000;
+    document.getElementById('notif-bell').appendChild(dropdown);
+  }
+
+  // Pedir notificaciones no leídas para el usuario
+  fetch('/catalogo/notificaciones/').then(r => r.json()).then(payload => {
+    const products = payload.unread || [];
+    if (products.length === 0) {
+      dropdown.innerHTML = '<div class="small text-muted p-2">No hay notificaciones nuevas</div>';
+    } else {
+      dropdown.innerHTML = products.map(p => `
+        <div class="d-flex align-items-center gap-2 p-2 border-bottom notif-item" data-id="${p.id}" data-product-id="${p.producto_id}">
+          <div style="width:48px;height:48px;flex:0 0 48px;overflow:hidden;border-radius:6px;background:#f6f6f6;"></div>
+          <div class="flex-grow-1">
+            <div class="small fw-bold">${p.producto}</div>
+            <div class="small text-muted">${new Date(p.creado_en).toLocaleString()}</div>
+          </div>
+        </div>`).join('');
+
+      // Añadir listeners para marcar como leídas al hacer clic
+      dropdown.querySelectorAll('.notif-item').forEach(el => {
+        el.addEventListener('click', function () {
+          const nid = this.getAttribute('data-id');
+          // POST para marcar como leído
+          fetch('/catalogo/notificaciones/marcar/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]
+            },
+            body: `notification_id=${nid}`
+          }).then(res => res.json()).then(resp => {
+            if (resp.ok) {
+              // remover el item y actualizar el contador
+              this.remove();
+              const bellCount = document.getElementById('bell-count');
+              let newCount = parseInt(bellCount.textContent || '0') - 1;
+              if (newCount <= 0) {
+                bellCount.style.display = 'none';
+              } else {
+                bellCount.textContent = newCount;
+              }
+            }
+          });
+        });
+      });
+    }
+  }).catch(err => console.error('Error loading notifications', err));
+
+  // Toggle visibility
+  dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+});
+</script>
 </body>
 </html>

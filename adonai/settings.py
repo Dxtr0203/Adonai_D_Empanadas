@@ -7,7 +7,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # === Seguridad / Debug (solo dev) ===
 SECRET_KEY = 'django-insecure-kfxcl-@8q4l=r8!c-)rb20w+cp&&8m&suw-$c^1=^fo+ar47)-'
 DEBUG = True  # Cambiar a False en producción
-ALLOWED_HOSTS = []  # Aquí puedes agregar los dominios permitidos cuando esté en producción
+# En desarrollo permitir hosts locales y 'testserver' para las pruebas con Client()
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']  # Aquí puedes agregar los dominios permitidos cuando esté en producción
 
 # === Apps ===
 INSTALLED_APPS = [
@@ -28,6 +29,7 @@ INSTALLED_APPS = [
     'chat',
     'core',
     'roles',  # Agregar la app de roles
+    'django.contrib.sites',
 ]
 
 # === Middleware ===
@@ -108,7 +110,7 @@ MEDIA_ROOT = BASE_DIR / "media"     # Ruta para los archivos subidos por usuario
 
 # === Autenticación y login multi-rol ===
 LOGIN_URL = '/usuarios/login/'  # Ruta para acceder al login
-LOGIN_REDIRECT_URL = "/panel/"  # Redirigir después de login, a la página principal del panel
+LOGIN_REDIRECT_URL = "/panel/"  # Redirigir después de login, a la página principal del panel (ajustado para tu panel personalizado)
 LOGOUT_REDIRECT_URL = "/"  # Redirigir después de logout a la página de inicio
 
 # === Configuración de Autenticación ===
@@ -128,3 +130,15 @@ LOGIN_BLOCK_TIME = 30  # Tiempo de bloqueo en segundos
 
 # --- Otras configuraciones ---
 SESSION_COOKIE_AGE = 86400  # La sesión expirará después de 24 horas (en segundos)
+
+# === Email (configurable por variables de entorno) ===
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@adonai.local')
+
+# Sites framework (necesario para construir enlaces con dominio)
+SITE_ID = int(os.environ.get('SITE_ID', 1))

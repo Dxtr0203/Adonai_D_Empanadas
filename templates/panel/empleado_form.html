@@ -1,0 +1,28 @@
+{% extends 'panel/base_panel.html' %}
+{% block title %}Empleado - Panel{% endblock %}
+
+{% block content %}
+<div class="card p-3">
+  <h4>{{ modo }} empleado</h4>
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label">Nombre</label>
+      {{ form.nombre }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      {{ form.email }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Teléfono</label>
+      {{ form.telefono }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Dirección</label>
+      {{ form.direccion }}
+    </div>
+    <button class="btn btn-primary">Guardar</button>
+  </form>
+</div>
+{% endblock %}
