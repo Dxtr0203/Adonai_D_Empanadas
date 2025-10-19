@@ -48,7 +48,12 @@
   </div>
 
   <div class="col-12">
-    <img id="preview" src="#" class="rounded d-none" style="max-height:160px; border:1px solid var(--border);" alt="Preview">
+    {# Mostrar imagen actual si existe (modo editar) #}
+    {% if form.instance and form.instance.imagen %}
+      <img id="preview" src="{{ form.instance.imagen.url }}" class="rounded" style="max-height:160px; border:1px solid #e6e6e6;" alt="Preview">
+    {% else %}
+      <img id="preview" src="#" class="rounded d-none" style="max-height:160px; border:1px solid #e6e6e6;" alt="Preview">
+    {% endif %}
   </div>
 
   <div class="col-12 d-flex gap-2">

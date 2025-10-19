@@ -94,12 +94,12 @@
             
             <div class="form-group">
                 <label for="id_username">Usuario:</label>
-                {{ form.username }}  <!-- Se usa el campo de formulario del username -->
+                <input type="text" name="username" id="id_username" class="form-control" required autofocus>
             </div>
             
             <div class="form-group">
                 <label for="id_password">Contraseña:</label>
-                {{ form.password }}  <!-- Se usa el campo de formulario de la contraseña -->
+                <input type="password" name="password" id="id_password" class="form-control" required>
             </div>
             
             <button type="submit" class="btn-submit">Iniciar sesión</button>

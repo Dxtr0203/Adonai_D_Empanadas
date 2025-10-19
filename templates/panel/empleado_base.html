@@ -1,0 +1,39 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Panel Empleado - Adonai{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f7fafc; }
+    .sidebar { width:220px; position:fixed; top:0; bottom:0; left:0; background:#ffffff; border-right:1px solid #e6eef6; padding:1rem; }
+    .content { margin-left:250px; padding:1.5rem; }
+    .sidebar a { display:block; padding:.4rem .6rem; color:#1f2937; text-decoration:none; border-radius:.4rem }
+    .sidebar a.active, .sidebar a:hover { background:#eef2ff; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h5>Empleado</h5>
+    <a href="{% url 'panel:empleado_area_dashboard' %}" class="{% if request.resolver_match.url_name == 'empleado_area_dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="{% url 'panel:empleado_area_inventario' %}" class="{% if request.resolver_match.url_name == 'empleado_area_inventario' %}active{% endif %}">Inventario</a>
+    <a href="{% url 'panel:empleado_area_perfil' %}">Mi perfil</a>
+    <hr>
+    <a href="{% url 'usuarios:logout' %}">Salir</a>
+  </div>
+
+  <div class="content">
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

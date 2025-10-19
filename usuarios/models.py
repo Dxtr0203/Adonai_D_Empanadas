@@ -24,6 +24,8 @@ class Usuario(models.Model):
     estado = models.CharField(max_length=10, choices=(('activo','activo'),('inactivo','inactivo')), default='activo')
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    # Forzar cambio de contraseña en el primer login (empleados creados por admin)
+    must_change_password = models.BooleanField(default=False)
 
     def __str__(self):
         return self.nombre

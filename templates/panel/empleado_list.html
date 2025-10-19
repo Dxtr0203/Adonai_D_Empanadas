@@ -1,0 +1,39 @@
+{% extends 'panel/base_panel.html' %}
+{% block title %}Empleados - Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Empleados</h3>
+  <a href="{% url 'panel:empleado_create' %}" class="btn btn-primary">Nuevo empleado</a>
+</div>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Nombre</th>
+      <th>Email</th>
+      <th>Rol</th>
+      <th>Estado</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in empleados %}
+    <tr>
+      <td>{{ e.nombre }}</td>
+      <td>{{ e.email }}</td>
+      <td>{{ e.rol.nombre }}</td>
+      <td>{{ e.estado }}</td>
+      <td class="text-end">
+        <a href="{% url 'panel:empleado_update' e.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+        <form method="post" action="{% url 'panel:empleado_delete' e.pk %}" style="display:inline">{% csrf_token %}
+          <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">No hay empleados.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
