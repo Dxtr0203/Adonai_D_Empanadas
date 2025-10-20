@@ -132,6 +132,9 @@ LOGIN_BLOCK_TIME = 30  # Tiempo de bloqueo en segundos
 # --- Otras configuraciones ---
 SESSION_COOKIE_AGE = 86400  # La sesión expirará después de 24 horas (en segundos)
 
+# Expirar la sesión al cerrar el navegador (útil en desarrollo para no mantener login persistente)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 # === Email (configurable por variables de entorno) ===
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
