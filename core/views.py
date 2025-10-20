@@ -1,7 +1,12 @@
 # core/views.py
 from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
 
-@login_required  # Asegura que solo los usuarios autenticados puedan acceder
+
 def inicio(request):
+    """Página de inicio pública para clientes.
+
+    Ahora pública: no redirige al login automáticamente. Si el usuario está
+    autenticado verá el menú de usuario en el header; si no, verá el botón
+    "Registrarse".
+    """
     return render(request, 'core/inicio.html')
