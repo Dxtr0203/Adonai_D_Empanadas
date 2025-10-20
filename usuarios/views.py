@@ -67,16 +67,10 @@ def register(request):
                 user_auth.is_active = (usuario.estado == 'activo')
                 user_auth.save()
 
-                # Loguear al usuario automáticamente y redirigir a la página de inicio
-                user = authenticate(request, username=username_for_auth, password=raw_password)
-                if user is not None:
-                    login(request, user)
-                    messages.success(request, 'Cuenta creada y sesión iniciada. Bienvenido!')
-                    # Redirigir a la página principal del cliente
-                    return redirect('inicio')
-                else:
-                    messages.success(request, 'Cuenta creada correctamente. Por favor inicia sesión.')
-                    return redirect('usuarios:login')
+                # Por seguridad/UX: no iniciar sesión automáticamente tras el registro.
+                # Redirigir al formulario de login y mostrar un mensaje de éxito.
+                messages.success(request, 'Cuenta creada correctamente. Por favor inicia sesión.')
+                return redirect('usuarios:login')
     else:
         form = RegistroForm()
 
