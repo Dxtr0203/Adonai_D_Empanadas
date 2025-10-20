@@ -1,0 +1,42 @@
+{% extends 'panel/base_panel.html' %}
+
+{% block title %}Clientes | Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Clientes registrados</h1>
+  <a href="{% url 'catalogo' %}" class="btn btn-outline-primary">Ver tienda</a>
+</div>
+
+{% if clientes %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Teléfono</th>
+          <th>Estado</th>
+          <th>Creado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+          <tr>
+            <td>{{ c.id }}</td>
+            <td>{{ c.nombre }}</td>
+            <td>{{ c.email }}</td>
+            <td>{{ c.telefono|default:'-' }}</td>
+            <td>{{ c.estado }}</td>
+            <td>{{ c.creado_en }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-info">No hay clientes registrados.</div>
+{% endif %}
+
+{% endblock %}
