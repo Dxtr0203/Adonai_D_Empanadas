@@ -28,6 +28,22 @@
       </div>
 
       <div class="mb-2">
+        {{ form.telefono.label_tag }}
+        {{ form.telefono }}
+        {% if form.telefono.errors %}
+          <div class="text-danger small">{{ form.telefono.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div class="mb-2">
+        {{ form.direccion.label_tag }}
+        {{ form.direccion }}
+        {% if form.direccion.errors %}
+          <div class="text-danger small">{{ form.direccion.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div class="mb-2">
         {{ form.password.label_tag }}
         {{ form.password }}
         {% if form.password.errors %}

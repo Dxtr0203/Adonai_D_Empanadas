@@ -24,6 +24,8 @@ urlpatterns = [
     path("empleados/nuevo/", views.empleado_create, name="empleado_create"),
     path("empleados/<int:pk>/editar/", views.empleado_update, name="empleado_update"),
     path("empleados/<int:pk>/eliminar/", views.empleado_delete, name="empleado_delete"),
+    # Clientes
+    path("clientes/", views.cliente_list, name="cliente_list"),
     # Area para empleados (limitada)
     path("empleados/area/", views_emp.empleado_dashboard, name="empleado_area_dashboard"),
     path("empleados/area/inventario/", views_emp.empleado_inventario, name="empleado_area_inventario"),

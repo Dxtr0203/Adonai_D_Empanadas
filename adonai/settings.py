@@ -115,6 +115,7 @@ LOGOUT_REDIRECT_URL = "/"  # Redirigir después de logout a la página de inicio
 
 # === Configuración de Autenticación ===
 AUTHENTICATION_BACKENDS = [
+    'usuarios.backends.UsuarioBackend',
     'django.contrib.auth.backends.ModelBackend',  # Autenticación por defecto
 ]
 

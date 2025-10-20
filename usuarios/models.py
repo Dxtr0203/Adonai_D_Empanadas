@@ -7,6 +7,10 @@ class Rol(models.Model):
 
     def __str__(self):
         return self.nombre
+    
+    class Meta:
+        db_table = 'roles'
+        managed = False
 
 # Usuarios
 class Usuario(models.Model):
@@ -18,7 +22,7 @@ class Usuario(models.Model):
     nombre = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)
-    rol = models.ForeignKey(Rol, on_delete=models.PROTECT)
+    rol = models.ForeignKey(Rol, on_delete=models.PROTECT, db_column='rol_id')
     telefono = models.CharField(max_length=20, blank=True, null=True)
     direccion = models.TextField(blank=True, null=True)
     estado = models.CharField(max_length=10, choices=(('activo','activo'),('inactivo','inactivo')), default='activo')
@@ -29,3 +33,7 @@ class Usuario(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    class Meta:
+        db_table = 'usuarios'
+        managed = False

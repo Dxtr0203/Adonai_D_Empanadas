@@ -16,17 +16,26 @@ from django.contrib.auth.decorators import login_required
 
 # Formulario simple para registro
 class RegistroForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput, label="Contraseña")
-    password_confirm = forms.CharField(widget=forms.PasswordInput, label="Confirmar contraseña")
+    # Hacemos opcional la contraseña en el formulario: si no se proporciona,
+    # asignaremos la contraseña por defecto 'clientes123'. Esto facilita el
+    # registro desde el header u otros formularios simples.
+    password = forms.CharField(widget=forms.PasswordInput, label="Contraseña", required=False)
+    password_confirm = forms.CharField(widget=forms.PasswordInput, label="Confirmar contraseña", required=False)
 
     class Meta:
         model = Usuario
-        fields = ['nombre', 'email', 'password', 'telefono', 'direccion']
+        fields = ['nombre', 'email', 'password', 'password_confirm', 'telefono', 'direccion']
 
     def clean(self):
         cleaned = super().clean()
         pw = cleaned.get('password')
         pw2 = cleaned.get('password_confirm')
+        # Si no se proporcionó contraseña, asignar la por defecto
+        if not pw and not pw2:
+            cleaned['password'] = 'clientes123'
+            cleaned['password_confirm'] = 'clientes123'
+            pw = pw2 = 'clientes123'
+
         if pw and pw2 and pw != pw2:
             raise forms.ValidationError('Las contraseñas no coinciden')
         return cleaned
@@ -37,27 +46,37 @@ def register(request):
     if request.method == 'POST':
         form = RegistroForm(request.POST)
         if form.is_valid():
-            raw_password = form.cleaned_data['password']
+            raw_password = form.cleaned_data.get('password') or 'clientes123'
             email = form.cleaned_data['email']
             username_for_auth = email.lower()
 
-            # Si ya existe un User con ese username/email, mostrar error
-            if User.objects.filter(username=username_for_auth).exists():
+            # Evitar duplicados: si ya existe un auth.User o un registro en usuarios
+            if User.objects.filter(username=username_for_auth).exists() or Usuario.objects.filter(email__iexact=email).exists():
                 form.add_error('email', 'Ya existe una cuenta con este correo. Por favor inicia sesión o recupera tu contraseña.')
             else:
-                # Crear el usuario de Django para que pueda autenticarse con LoginView
-                user_auth = User.objects.create_user(username=username_for_auth, email=email, password=raw_password)
-
-                usuario = form.save(commit=False)
-                # Hashear la contraseña antes de guardar en el modelo Usuario
-                usuario.password = make_password(raw_password)
-                # Asignar rol 'Cliente' (crearlo si no existe)
+                # Crear el usuario en la tabla legacy (Usuario) con password hasheada
                 from .models import Rol
                 rol_cliente, _created = Rol.objects.get_or_create(nombre='Cliente', defaults={'descripcion': 'Rol por defecto: Cliente'})
+                usuario = form.save(commit=False)
+                usuario.password = make_password(raw_password)
                 usuario.rol = rol_cliente
                 usuario.save()
-                messages.success(request, 'Cuenta creada correctamente. Puedes iniciar sesión ahora.')
-                return redirect('usuarios:login')
+
+                # Crear el auth.User sincronizado y marcar como activo
+                user_auth = User.objects.create_user(username=username_for_auth, email=email, password=raw_password)
+                user_auth.is_active = (usuario.estado == 'activo')
+                user_auth.save()
+
+                # Loguear al usuario automáticamente y redirigir a la página de inicio
+                user = authenticate(request, username=username_for_auth, password=raw_password)
+                if user is not None:
+                    login(request, user)
+                    messages.success(request, 'Cuenta creada y sesión iniciada. Bienvenido!')
+                    # Redirigir a la página principal del cliente
+                    return redirect('inicio')
+                else:
+                    messages.success(request, 'Cuenta creada correctamente. Por favor inicia sesión.')
+                    return redirect('usuarios:login')
     else:
         form = RegistroForm()
 
@@ -107,7 +126,8 @@ def custom_login(request):
                 except Usuario.DoesNotExist:
                     pass
                 return redirect('panel:empleado_area_dashboard')  # Redirige al dashboard del empleado
-            return redirect('usuarios:perfil')  # Redirige al perfil por defecto
+            # Para usuarios normales (clientes), redirigir a la página principal
+            return redirect('inicio')  # Redirige a la página principal del cliente
 
         # Si el usuario no es válido, muestra el mensaje de error
         messages.error(request, "Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.")
@@ -123,21 +143,12 @@ def custom_login(request):
 # Vista para el perfil del usuario (requiere autenticación)
 @login_required
 def perfil(request):
-    usuario = request.user  # Obtiene el usuario autenticado
-
-    # Si se recibe un POST (al editar el perfil), procesamos los datos del formulario
-    if request.method == "POST":
-        form = UsuarioForm(request.POST, instance=usuario)  # Rellena el formulario con los datos del usuario
-        if form.is_valid():  # Verifica si el formulario es válido
-            form.save()  # Guarda los cambios en el perfil
-            messages.success(request, "¡Perfil actualizado correctamente!")  # Mensaje de éxito
-            return redirect('usuarios:perfil')  # Redirige al perfil después de guardar los cambios
-        else:
-            messages.error(request, "Hubo un error al actualizar el perfil. Por favor, revisa los campos.")  # Mensaje de error
-    else:
-        form = UsuarioForm(instance=usuario)  # Si es GET, mostramos el formulario con los datos actuales del usuario
-
-    return render(request, 'usuarios/perfil.html', {'usuario': usuario, 'form': form})  # Muestra el perfil y el formulario
+    # Mostrar el perfil del usuario (solo lectura). No permitir edición desde aquí.
+    try:
+        usuario = Usuario.objects.get(email__iexact=request.user.email)
+    except Usuario.DoesNotExist:
+        usuario = request.user  # fallback al auth.User
+    return render(request, 'usuarios/perfil.html', {'usuario': usuario})
 
 
 @method_decorator(login_required, name='dispatch')

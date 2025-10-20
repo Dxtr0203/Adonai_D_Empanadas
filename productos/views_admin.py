@@ -160,6 +160,18 @@ def empleado_list(request):
 
 
 @login_required
+def cliente_list(request):
+    """Lista los clientes registrados (rol 'Cliente')."""
+    # Permitir a superusers y a quien tenga permiso de ver usuarios
+    if not (request.user.is_superuser or request.user.has_perm('usuarios.view_usuario')):
+        messages.error(request, 'No tienes permiso para ver la lista de clientes.')
+        return redirect('panel:dashboard')
+
+    qs = Usuario.objects.filter(rol__nombre__iexact='Cliente').order_by('-creado_en')
+    return render(request, 'panel/cliente_list.html', {'clientes': qs})
+
+
+@login_required
 def empleado_create(request):
     # Comprobación explícita de permisos para dar feedback claro en UI
     if not request.user.has_perm('usuarios.add_usuario'):
