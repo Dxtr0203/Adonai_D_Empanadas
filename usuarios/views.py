@@ -81,7 +81,7 @@ def custom_login(request):
     # Verifica los intentos fallidos (inicializar siempre para evitar UnboundLocalError)
     failed_attempts = request.session.get('failed_attempts', 0)
     last_failed_time_raw = request.session.get('last_failed_time', None)
-
+    # Solo procesar credenciales cuando es un POST: evita incrementar contadores en GET
     if request.method == 'POST':
         username = request.POST.get('username')  # Aquí debería ir el email si estás usando el email como username
         password = request.POST.get('password')
@@ -100,13 +100,17 @@ def custom_login(request):
             time_since_last_attempt = timezone.now() - last_failed_time
             if time_since_last_attempt.total_seconds() < settings.LOGIN_BLOCK_TIME:
                 messages.error(request, f"Has superado el número máximo de intentos. Intenta nuevamente en {settings.LOGIN_BLOCK_TIME} segundos.")
-                return redirect('usuarios:login')  # Redirige al login para intentar nuevamente después del bloqueo
+                # Renderizar la plantilla de login en vez de redirigir para evitar posibles bucles
+                return render(request, 'usuarios/login.html')
 
         # Autentica al usuario
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
             login(request, user)  # Inicia sesión si las credenciales son correctas
+            # Resetear contadores de intentos al iniciar sesión correctamente
+            request.session['failed_attempts'] = 0
+            request.session['last_failed_time'] = None
             # Si es superuser, redirigir al panel personalizado de la aplicación
             if user.is_superuser:
                 return redirect('panel:dashboard')  # Redirige al dashboard de tu panel personalizado
@@ -123,13 +127,11 @@ def custom_login(request):
             # Para usuarios normales (clientes), redirigir a la página principal
             return redirect('inicio')  # Redirige a la página principal del cliente
 
-        # Si el usuario no es válido, muestra el mensaje de error
+        # Si el usuario no es válido, muestra el mensaje de error y contabiliza el intento
         messages.error(request, "Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.")
-        
-    # Incrementa los intentos fallidos
-    request.session['failed_attempts'] = failed_attempts + 1
-    # Guardar como ISO string para que sea serializable
-    request.session['last_failed_time'] = timezone.now().isoformat()
+        # Incrementa los intentos fallidos solo en POST fallidos
+        request.session['failed_attempts'] = failed_attempts + 1
+        request.session['last_failed_time'] = timezone.now().isoformat()
 
     return render(request, 'usuarios/login.html')  # Vuelve a mostrar el formulario de login
 
