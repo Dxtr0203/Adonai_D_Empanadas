@@ -13,6 +13,8 @@ from django.contrib.auth.views import PasswordChangeView
 from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.shortcuts import resolve_url
 
 # Formulario simple para registro
 class RegistroForm(forms.ModelForm):
@@ -111,6 +113,14 @@ def custom_login(request):
             # Resetear contadores de intentos al iniciar sesión correctamente
             request.session['failed_attempts'] = 0
             request.session['last_failed_time'] = None
+
+            # Manejar redirección 'next' (si viene de login?next=/ruta)
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url:
+                # Validar que el next sea seguro
+                if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                    return redirect(next_url)
+
             # Si es superuser, redirigir al panel personalizado de la aplicación
             if user.is_superuser:
                 return redirect('panel:dashboard')  # Redirige al dashboard de tu panel personalizado
