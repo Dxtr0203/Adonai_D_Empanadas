@@ -99,8 +99,13 @@ def custom_login(request):
         if failed_attempts >= settings.LOGIN_FAILURE_LIMIT and last_failed_time is not None:
             time_since_last_attempt = timezone.now() - last_failed_time
             if time_since_last_attempt.total_seconds() < settings.LOGIN_BLOCK_TIME:
-                messages.error(request, f"Has superado el número máximo de intentos. Intenta nuevamente en {settings.LOGIN_BLOCK_TIME} segundos.")
-                return redirect('usuarios:login')  # Redirige al login para intentar nuevamente después del bloqueo
+                # Si el middleware marcó la request como bloqueada, mostramos el mensaje
+                # sin redirigir (evitar bucle). De lo contrario, redirigimos al login.
+                if getattr(request, 'login_blocked', False):
+                    messages.error(request, f"Has superado el número máximo de intentos. Intenta nuevamente en {settings.LOGIN_BLOCK_TIME} segundos.")
+                    # Continuar para renderizar la plantilla de login con el mensaje
+                else:
+                    return redirect('usuarios:login')  # Redirige al login para intentar nuevamente después del bloqueo
 
         # Autentica al usuario
         user = authenticate(request, username=username, password=password)

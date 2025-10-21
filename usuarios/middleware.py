@@ -33,7 +33,18 @@ class LoginAttemptsMiddleware:
         if failed_attempts >= settings.LOGIN_FAILURE_LIMIT and last_failed_time is not None:
             time_since_last_attempt = timezone.now() - last_failed_time
             if time_since_last_attempt.total_seconds() < settings.LOGIN_BLOCK_TIME:
-                # Bloquea al usuario por el tiempo configurado
+                # Evitar bucle: si el usuario está intentando acceder al formulario de login,
+                # no redirigimos de nuevo al mismo endpoint porque el navegador generará
+                # un bucle de redirecciones (ERR_TOO_MANY_REDIRECTS). En su lugar, dejamos
+                # que la vista de login se procese para que pueda mostrar un mensaje
+                # informando del bloqueo.
+                login_path = getattr(settings, 'LOGIN_URL', '/usuarios/login/')
+                # Normalizar posibles valores (e.g. nombres con dominio)
+                if request.path == login_path or request.path.rstrip('/') == login_path.rstrip('/'):
+                    # Marcar en la request para que la vista pueda mostrar un mensaje si lo desea
+                    request.login_blocked = True
+                    return self.get_response(request)
+                # Para cualquier otra ruta, redirigimos al login (sin provocar bucle)
                 return redirect('usuarios:login')  # Redirige al login con bloqueo
 
         # Solo incrementar los intentos fallidos si el intento de login es fallido
