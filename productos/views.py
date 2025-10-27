@@ -30,6 +30,14 @@ def catalogo(request):
     if categoria_id:
         productos = productos.filter(categoria_id=categoria_id)
 
+    # Filtrar por término de búsqueda (nombre o descripción)
+    q = request.GET.get('q')
+    if q:
+        q_clean = q.strip()
+        if q_clean:
+            # Buscar en nombre o descripción (case-insensitive)
+            productos = productos.filter(Q(nombre__icontains=q_clean) | Q(descripcion__icontains=q_clean))
+
     # Filtrar por rango de precio si se pasa en GET
     precio_min = request.GET.get('precio_min')
     precio_max = request.GET.get('precio_max')
@@ -43,6 +51,7 @@ def catalogo(request):
         "productos": productos,
         "categorias": categorias,
         "categoria_id": categoria_id,
+        "q": q,
         "precio_min": precio_min,
         "precio_max": precio_max,
     })

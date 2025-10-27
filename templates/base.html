@@ -67,7 +67,7 @@
         <!-- El botón de agregar producto ya fue eliminado -->
         
         {% url 'carrito' as url_carrito %}
-        <a href="{{ url_carrito|default:'#' }}" class="btn btn-outline-secondary btn-sm" {% if not url_carrito %}rel="nofollow"{% endif %}>
+        <a id="top-cart-btn" href="{{ url_carrito|default:'#' }}" class="btn btn-outline-secondary btn-sm" {% if not url_carrito %}rel="nofollow"{% endif %}>
           <i class="bi bi-cart"></i> Carrito
         </a>
 
@@ -127,9 +127,32 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/cart.js' %}"></script>
 {% block extra_js %}{% endblock %}
 {# Incluir el widget de chat (parcial) para que esté disponible en todas las páginas #}
 {% include 'chat/widget.html' %}
+
+<!-- Global Cart Modal (available site-wide) -->
+<div class="modal fade" id="cart-modal" tabindex="-1" aria-labelledby="cart-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cart-modal-label">Carrito de Compras</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="cart-items"> <!-- rellenado por JS --> </div>
+      </div>
+      <div class="modal-footer d-flex align-items-center">
+        <div class="me-auto fw-bold">
+          Total: <span id="cart-total">Bs. 0.00</span>
+        </div>
+        <a id="go-to-checkout" class="btn btn-primary" href="{% url 'carrito:checkout' %}">Ir a pagar</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 // Polling simple para notificaciones de productos nuevos

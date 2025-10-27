@@ -18,6 +18,12 @@ class UsuarioForm(forms.ModelForm):
     class Meta:
         model = Usuario
         fields = ['nombre', 'email', 'telefono', 'direccion']  # Los campos del modelo Usuario que pueden ser editados
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre completo'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'correo@ejemplo.com'}),
+            'telefono': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '(+591) 7xx-xxxxxx'}),
+            'direccion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Dirección, ciudad, referencia'}),
+        }
 
 class RegistroFormulario(forms.ModelForm):
     password1 = forms.CharField(widget=forms.PasswordInput, label="Contraseña")

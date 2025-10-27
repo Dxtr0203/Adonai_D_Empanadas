@@ -27,6 +27,12 @@ class RegistroForm(forms.ModelForm):
     class Meta:
         model = Usuario
         fields = ['nombre', 'email', 'password', 'password_confirm', 'telefono', 'direccion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre completo'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'correo@ejemplo.com'}),
+            'telefono': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '(+591) 7xx-xxxxxx'}),
+            'direccion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Dirección, ciudad, referencia'}),
+        }
 
     def clean(self):
         cleaned = super().clean()
@@ -149,12 +155,64 @@ def custom_login(request):
 # Vista para el perfil del usuario (requiere autenticación)
 @login_required
 def perfil(request):
-    # Mostrar el perfil del usuario (solo lectura). No permitir edición desde aquí.
+    # Permitir que el usuario edite su perfil desde esta vista.
     try:
         usuario = Usuario.objects.get(email__iexact=request.user.email)
     except Usuario.DoesNotExist:
-        usuario = request.user  # fallback al auth.User
-    return render(request, 'usuarios/perfil.html', {'usuario': usuario})
+        # Si no existe el registro legacy, intentamos usar el auth.User como fallback
+        usuario = None
+
+    if request.method == 'POST':
+        # Si tenemos registro en Usuario, lo editamos; si no, intentamos guardar en auth.User (mínimo)
+        if usuario:
+            form = UsuarioForm(request.POST, instance=usuario)
+        else:
+            # Crear un pequeño objeto temporal para validar los campos
+            form = UsuarioForm(request.POST)
+
+        if form.is_valid():
+            saved = form.save(commit=False)
+            # Si existe el registro legacy, guardar y sincronizar con auth.User
+            if usuario:
+                saved.id = usuario.id
+                saved.save()
+            else:
+                # No tenemos modelo Usuario: intenta crear uno asociado al email actual
+                try:
+                    saved.save()
+                except Exception:
+                    pass
+
+            # Sincronizar el email en auth.User si es necesario
+            try:
+                from django.contrib.auth.models import User as AuthUser
+                auth_user = AuthUser.objects.filter(email__iexact=request.user.email).first()
+                if auth_user:
+                    # Actualizar email si el formulario lo cambió
+                    new_email = form.cleaned_data.get('email')
+                    if new_email and new_email.lower() != auth_user.email.lower():
+                        auth_user.email = new_email.lower()
+                        auth_user.username = new_email.lower()
+                        auth_user.save()
+            except Exception:
+                pass
+
+            messages.success(request, 'Perfil actualizado correctamente.')
+            return redirect('usuarios:perfil')
+    else:
+        if usuario:
+            form = UsuarioForm(instance=usuario)
+        else:
+            # Rellenar campos mínimos desde auth.User
+            initial = {}
+            try:
+                initial['email'] = request.user.email
+                initial['nombre'] = getattr(request.user, 'first_name', '')
+            except Exception:
+                pass
+            form = UsuarioForm(initial=initial)
+
+    return render(request, 'usuarios/perfil.html', {'form': form, 'usuario_obj': usuario})
 
 
 @method_decorator(login_required, name='dispatch')
