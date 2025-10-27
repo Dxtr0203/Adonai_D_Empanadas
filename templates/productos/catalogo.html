@@ -16,7 +16,7 @@
   <div class="card-body row g-2 align-items-end">
     <div class="col-md-4">
       <label class="form-label">Categoría</label>
-      <select name="categoria" class="form-select">
+  <select id="filter-categoria" name="categoria" class="form-select">
         <option value="">Todas</option>
         {% for c in categorias %}
           <option value="{{ c.id }}" {% if request.GET.categoria|default:'' == c.id|stringformat:"s" %}selected{% endif %}>
@@ -27,10 +27,11 @@
     </div>
     <div class="col-md-5">
       <label class="form-label">Buscar</label>
-      <input name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Nombre o descripción...">
+  <input id="filter-q" name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Nombre o descripción...">
     </div>
     <div class="col-md-3">
-      <button class="btn btn-outline-primary w-100">Filtrar</button>
+      <!-- Filtrado automático: el botón fue removido. Los filtros se aplican al cambiar o escribir. -->
+      <div class="form-text text-muted">Los resultados se actualizan automáticamente al seleccionar o escribir.</div>
     </div>
   </div>
 </form>
@@ -56,8 +57,9 @@
           </div>
           <div class="card-footer bg-white">
             <button class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#productModal{{ p.id }}">Ver Detalles</button>
-            <input type="number" id="quantity-{{ p.id }}" class="form-control mb-2" min="1" value="1">
-            <button class="btn btn-sm btn-outline-primary w-100" onclick="addToCart({{ p.id }}, '{{ p.nombre }}', '{{ p.precio }}', document.getElementById('quantity-{{ p.id }}').value)">Añadir al carrito</button>
+            <input type="number" id="quantity-{{ p.id }}" class="form-control mb-1 quantity-input" min="1" value="1" inputmode="numeric" pattern="[0-9]*" data-stock="{{ p.stock_actual }}">
+            <div id="qty-error-{{ p.id }}" class="form-text text-danger small d-none"></div>
+            <button class="btn btn-sm btn-outline-primary w-100" onclick="addToCart({{ p.id }}, '{{ p.nombre|escapejs }}', '{{ p.precio }}', document.getElementById('quantity-{{ p.id }}').value, 'quantity-{{ p.id }}')">Añadir al carrito</button>
           </div>
         </div>
       </div>
@@ -82,8 +84,9 @@
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-              <input type="number" id="quantity-{{ p.id }}-modal" class="form-control" min="1" value="1">
-              <button type="button" class="btn btn-primary" onclick="addToCart({{ p.id }}, '{{ p.nombre }}', '{{ p.precio }}', document.getElementById('quantity-{{ p.id }}-modal').value)">Añadir al carrito</button>
+              <input type="number" id="quantity-{{ p.id }}-modal" class="form-control quantity-input" min="1" value="1" inputmode="numeric" pattern="[0-9]*" data-stock="{{ p.stock_actual }}">
+              <div id="qty-error-{{ p.id }}-modal" class="form-text text-danger small d-none"></div>
+              <button type="button" class="btn btn-primary" onclick="addToCart({{ p.id }}, '{{ p.nombre|escapejs }}', '{{ p.precio }}', document.getElementById('quantity-{{ p.id }}-modal').value, 'quantity-{{ p.id }}-modal')">Añadir al carrito</button>
             </div>
           </div>
         </div>
@@ -94,120 +97,6 @@
   <div class="alert alert-info">No hay productos que coincidan con los filtros seleccionados.</div>
 {% endif %}
 
-<!-- Carrito Modal -->
-<div class="modal fade" id="cart-modal" tabindex="-1" aria-labelledby="cart-modal-label" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="cart-modal-label">Carrito de Compras</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="cart-items">
-        <!-- Los productos del carrito se mostrarán aquí -->
-      </div>
-      <div class="modal-footer">
-        <a id="go-to-checkout" class="btn btn-primary" href="{% url 'carrito:checkout' %}">Ir a pagar</a>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Función para agregar productos al carrito
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-// Función para agregar un producto al carrito
-function addToCart(productId, productName, productPrice, quantity) {
-  quantity = parseInt(quantity);  // Asegurarse que la cantidad sea un número entero
-
-  const product = {
-    id: productId,
-    nombre: productName,
-    precio: productPrice,
-    cantidad: quantity
-  };
-
-  // Verifica si el producto ya está en el carrito
-  const existingProduct = cart.find(item => item.id === productId);
-  if (existingProduct) {
-    existingProduct.cantidad += quantity;  // Si ya está, incrementa la cantidad
-  } else {
-    cart.push(product);
-  }
-
-  // Guarda el carrito en localStorage
-  localStorage.setItem('cart', JSON.stringify(cart));
-
-  // Actualiza el contador del carrito
-  document.getElementById('cart-count').innerText = cart.length;
-
-  alert("Producto añadido al carrito");
-  console.log(cart);  // Esto solo para depuración
-}
-
-// Función para mostrar el carrito
-function showCart() {
-  const cartItems = document.getElementById("cart-items");
-  cartItems.innerHTML = ''; // Limpiar el contenido actual del carrito
-
-  if (cart.length === 0) {
-    cartItems.innerHTML = '<p>No hay productos en el carrito.</p>';
-  } else {
-    cart.forEach(item => {
-      const productDiv = document.createElement('div');
-      productDiv.classList.add('cart-item');
-      productDiv.innerHTML = `
-        <p>${item.nombre} - Bs. ${item.precio} x 
-          <input type="number" class="quantity" value="${item.cantidad}" min="1" onchange="updateQuantity(${item.id}, this.value)">
-        </p>
-        <button onclick="removeFromCart(${item.id})">Eliminar</button>
-      `;
-      cartItems.appendChild(productDiv);
-    });
-  }
-}
-
-// Función para actualizar la cantidad en el carrito
-function updateQuantity(productId, newQuantity) {
-  const product = cart.find(item => item.id === productId);
-  if (product) {
-    product.cantidad = parseInt(newQuantity);
-    localStorage.setItem('cart', JSON.stringify(cart));
-    showCart();  // Actualizar la vista del carrito
-  }
-}
-
-// Función para eliminar productos del carrito
-function removeFromCart(productId) {
-  cart = cart.filter(item => item.id !== productId);
-  localStorage.setItem('cart', JSON.stringify(cart));
-  showCart();
-}
-
-// Mostrar carrito cuando se hace clic en el icono del carrito
-document.getElementById('cart-icon').addEventListener('click', function() {
-  showCart();
-});
-
-// Mostrar el carrito en el modal
-$('#cart-modal').on('shown.bs.modal', function () {
-  showCart();
-});
-
-// Comportamiento del botón 'Ir a pagar'
-document.getElementById('go-to-checkout').addEventListener('click', function () {
-  const cart = JSON.parse(localStorage.getItem('cart')) || [];
-  if (!cart || cart.length === 0) {
-    alert('Tu carrito está vacío. Añade productos antes de ir a pagar.');
-    event.preventDefault();
-    return false;
-  }
-  // Si hay items, dejamos que el enlace siga a la URL de checkout.
-  // La vista de servidor `checkout` está decorada con @login_required, por lo que
-  // si el usuario no está autenticado Django redirigirá a login?next=/carrito/checkout/.
-  return true;
-});
-</script>
+<!-- Cart modal and cart JS moved to base.html -->
 
 {% endblock %}
