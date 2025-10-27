@@ -7,8 +7,12 @@ document.addEventListener('DOMContentLoaded', function(){
   const sendBtn = document.getElementById('chat-send');
   const input = document.getElementById('chat-input');
   const messages = document.getElementById('chat-messages');
+  const optionsBox = document.getElementById('chat-options');
 
   if(!toggle || !panel) return;
+
+  const userId = toggle.getAttribute('data-user-id') || null;
+  const isAuthenticated = toggle.getAttribute('data-authenticated') === '1';
 
   function appendMessage(author, text){
     try{
@@ -38,8 +42,21 @@ document.addEventListener('DOMContentLoaded', function(){
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
+      .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function renderOptions(list){
+    if(!optionsBox) return;
+    optionsBox.innerHTML = '';
+    if(!list || !list.length) return;
+    list.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm btn-outline-secondary me-1 mb-1';
+      btn.textContent = opt;
+      btn.addEventListener('click', function(){ sendOption(opt); });
+      optionsBox.appendChild(btn);
+    });
   }
 
   toggle.addEventListener('click', function(){
@@ -103,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function(){
       const res = await fetch('/chat/send/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify(body)
       });
       if(!res.ok) {
         removeTyping();

@@ -4,28 +4,45 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 import re
 
+from django.utils.timezone import now
+from .models import Chat, MensajeChat
+from usuarios.models import Usuario
+from productos.models import Producto, Categoria
+from ventas.models import Venta, VentaDetalle
+from django.db.models import Sum
+
 
 def chat_widget(request):
-	"""Renderiza el fragmento del widget de chat para incluir en el base.html."""
-	return render(request, 'chat/widget.html')
+	"""Renderiza el fragmento del widget de chat para incluir en el base.html.
+	Si la plantilla no existe, la vista sigue disponible para integración.
+	"""
+	try:
+		return render(request, 'chat/widget.html')
+	except Exception:
+		# Si no hay plantilla, devolvemos una respuesta sencilla
+		return JsonResponse({'ok': False, 'error': 'widget template not found'}, status=404)
 
 
 @csrf_exempt
 def chat_send(request):
-	"""Endpoint POST que recibe {'message': '...'} y devuelve la respuesta del bot.
+	"""Endpoint POST que recibe {'message': '...'} o {'option': '...'} y devuelve la respuesta del bot.
 
-	Por ahora el bot es un echo simple que devuelve el mismo mensaje con prefijo.
+	Guarda los mensajes en los modelos `Chat` y `MensajeChat` cuando sea posible.
+	Respuestas automáticas básicas (saludo, opciones, consultas simples).
 	"""
 	if request.method != 'POST':
 		return JsonResponse({'ok': False, 'error': 'Método no permitido'}, status=405)
 
 	try:
 		payload = json.loads(request.body.decode('utf-8'))
-		message = payload.get('message', '').strip()
 	except Exception:
 		return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
 
-	if not message:
+	message = (payload.get('message') or '').strip()
+	option = payload.get('option')
+	usuario_id = payload.get('usuario_id')
+
+	if not message and not option:
 		return JsonResponse({'ok': False, 'error': 'Mensaje vacío'}, status=400)
 
 	# Respuestas predeterminadas en backend como fallback
