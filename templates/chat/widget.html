@@ -10,6 +10,15 @@
       <strong>Chatbot</strong>
       <button id="chat-close" class="btn btn-sm btn-link">Cerrar</button>
     </div>
+    <!-- Quick action buttons (Información rápida) -->
+    <div id="chat-quick-actions" class="p-2" style="display:block;background:#ffffff;border-bottom:1px solid #eee;">
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-primary quick-action">Información tienda</button>
+        <button class="btn btn-sm btn-outline-primary quick-action">Catálogo</button>
+        <button class="btn btn-sm btn-outline-primary quick-action">Servicios</button>
+        <button class="btn btn-sm btn-outline-primary quick-action">Horarios</button>
+      </div>
+    </div>
     <div id="chat-messages" class="card-body" style="overflow:auto;height:300px;background:#f8f9fa"></div>
     <div id="chat-options" class="mt-0" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;"></div>
     <div class="card-footer">
@@ -33,3 +42,20 @@
 </style>
 
 <script src="{% static 'js/chat_widget.js' %}"></script>
+
+<script>
+  // Inline diagnostic marker: should appear once if the template is included and scripts run
+  (function(){
+    try{
+      var m = document.getElementById('chat-messages');
+      if(m && !window._adonai_chat_marker){
+        var el = document.createElement('div');
+        el.className = 'mb-2';
+        el.innerHTML = '<div class="text-start"><div class="d-inline-block p-2 bg-warning text-dark rounded">[WIDGET OK] El template del chat se ha incluido (mensaje visible para diagnóstico).</div></div>';
+        m.appendChild(el);
+        m.scrollTop = m.scrollHeight;
+        window._adonai_chat_marker = true;
+      }
+    }catch(e){ console.error('chat widget inline marker error', e); }
+  })();
+</script>

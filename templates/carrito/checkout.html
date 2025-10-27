@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Checkout | Adonai{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3">Checkout</h1>
+  <p>Aquí revisarás tu pedido y completarás la compra.</p>
+  <div id="checkout-cart"></div>
+  <form method="post" action="">
+    {% csrf_token %}
+    <button class="btn btn-success">Pagar ahora</button>
+  </form>
+</div>
+
+<script>
+// Mostrar el carrito almacenado en localStorage para revisión antes del pago
+let cart = JSON.parse(localStorage.getItem('cart')) || [];
+const container = document.getElementById('checkout-cart');
+if (cart.length === 0) {
+  container.innerHTML = '<p>No hay productos en el carrito.</p>';
+} else {
+  let html = '<ul class="list-group">';
+  cart.forEach(item => {
+    html += `<li class="list-group-item">${item.nombre} - Bs. ${item.precio} x ${item.cantidad}</li>`;
+  });
+  html += '</ul>';
+  container.innerHTML = html;
+}
+</script>
+{% endblock %}
