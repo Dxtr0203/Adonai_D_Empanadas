@@ -1,4 +1,7 @@
 from django.shortcuts import render, redirect
+import logging
+
+logger = logging.getLogger(__name__)
 from .models import Producto, Categoria
 from .forms import ProductoForm
 from django.contrib import messages
@@ -64,6 +67,14 @@ def agregar_producto(request):
                     # no bloquear el guardado por errores al buscar usuario
                     pass
             producto.save()
+            # Crear una notificación para este nuevo producto
+            try:
+                n = Notification.objects.create(producto=producto)
+                logger.info(f"Notification created (id={n.id}) for producto id={producto.id} by view agregar_producto")
+            except Exception:
+                # No queremos romper el flujo si algo falla en las notificaciones
+                logger.exception("Failed to create Notification in agregar_producto")
+                pass
             messages.success(request, f"✅ '{producto.nombre}' agregado correctamente.")
             return redirect("catalogo")
         else:
@@ -99,6 +110,7 @@ def notifications_unread(request):
     simplificar el manejo en el frontend.
     """
     if not request.user.is_authenticated:
+        logger.debug('notifications_unread called by anonymous user')
         return JsonResponse({'unread': []})
 
     user = request.user
@@ -108,6 +120,7 @@ def notifications_unread(request):
         if not NotificationRead.objects.filter(notification=n, user=user).exists():
             unread.append({'id': n.id, 'producto': n.producto.nombre, 'creado_en': n.creado_en.isoformat(), 'producto_id': n.producto.id})
     unread_count = len(unread)
+    logger.debug(f'notifications_unread for user={user.username} -> {unread_count} unread')
     return JsonResponse({'unread': unread, 'count': unread_count})
 
 
@@ -119,6 +132,7 @@ def mark_notification_read(request):
     Devuelve JSON {'ok': True, 'count': <unread_count>} cuando se marca.
     """
     if not request.user.is_authenticated:
+        logger.debug('mark_notification_read called by anonymous user')
         return JsonResponse({'ok': False, 'error': 'not_authenticated'}, status=401)
 
     user = request.user
@@ -141,6 +155,7 @@ def mark_notification_read(request):
         return JsonResponse({'ok': False, 'error': 'not found'}, status=404)
 
     NotificationRead.objects.get_or_create(notification=n, user=user, defaults={'read_at': timezone.now()})
+    logger.info(f'User {user.username} marked notification {n.id} as read')
 
     # contar no leídas restantes
     unread_count = Notification.objects.exclude(id__in=NotificationRead.objects.filter(user=user).values_list('notification_id', flat=True)).count()

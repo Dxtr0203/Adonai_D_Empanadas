@@ -54,6 +54,22 @@ class Inventario(models.Model):
     fecha_movimiento = models.DateTimeField(auto_now_add=True)
 
 
+# Señal: crear notificación cuando se agregue entrada de inventario
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=Inventario)
+def crear_notificacion_inventario(sender, instance, created, **kwargs):
+    try:
+        if created and instance.tipo_movimiento == 'Entrada':
+            # Crear notificación para el producto asociado
+            Notification.objects.create(producto=instance.producto)
+    except Exception:
+        # No interrumpir la transacción por fallos en notificaciones
+        pass
+
+
 # Notificaciones por producto nuevo
 class Notification(models.Model):
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
@@ -77,3 +93,37 @@ class NotificationRead(models.Model):
 # Crear notificación automáticamente al crear un producto
 # Note: signal to auto-create Notification on Producto creation was removed to revert
 # to the previous UX (notifications are shown from the `ultimos` endpoint).
+
+# Señales para Producto: crear notificación al crear producto o al aumentar stock
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
+
+
+@receiver(pre_save, sender=Producto)
+def producto_pre_save(sender, instance, **kwargs):
+    # Guardar el stock actual previo en un atributo temporal para su comparación en post_save
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._previous_stock = old.stock_actual
+        except sender.DoesNotExist:
+            instance._previous_stock = None
+    else:
+        instance._previous_stock = None
+
+
+@receiver(post_save, sender=Producto)
+def producto_post_save(sender, instance, created, **kwargs):
+    try:
+        # Si es un producto nuevo, crear notificación
+        if created:
+            Notification.objects.create(producto=instance)
+            return
+
+        # Si no es nuevo, comprobar si el stock aumentó
+        prev = getattr(instance, '_previous_stock', None)
+        if prev is not None and instance.stock_actual > prev:
+            Notification.objects.create(producto=instance)
+    except Exception:
+        # No bloquear la operación principal por fallos en notificaciones
+        pass
