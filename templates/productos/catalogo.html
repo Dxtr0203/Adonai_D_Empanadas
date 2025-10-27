@@ -106,7 +106,7 @@
         <!-- Los productos del carrito se mostrarán aquí -->
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary">Ir a pagar</button>
+        <a id="go-to-checkout" class="btn btn-primary" href="{% url 'carrito:checkout' %}">Ir a pagar</a>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>
@@ -193,6 +193,20 @@ document.getElementById('cart-icon').addEventListener('click', function() {
 // Mostrar el carrito en el modal
 $('#cart-modal').on('shown.bs.modal', function () {
   showCart();
+});
+
+// Comportamiento del botón 'Ir a pagar'
+document.getElementById('go-to-checkout').addEventListener('click', function () {
+  const cart = JSON.parse(localStorage.getItem('cart')) || [];
+  if (!cart || cart.length === 0) {
+    alert('Tu carrito está vacío. Añade productos antes de ir a pagar.');
+    event.preventDefault();
+    return false;
+  }
+  // Si hay items, dejamos que el enlace siga a la URL de checkout.
+  // La vista de servidor `checkout` está decorada con @login_required, por lo que
+  // si el usuario no está autenticado Django redirigirá a login?next=/carrito/checkout/.
+  return true;
 });
 </script>
 

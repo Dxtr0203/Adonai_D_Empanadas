@@ -61,7 +61,7 @@
 
       <div class="mb-3 d-flex gap-2">
         <button class="btn btn-primary">Crear cuenta</button>
-        <a href="{% url 'usuarios:login' %}" class="btn btn-outline-secondary">Ya tengo cuenta</a>
+        <a href="{% url 'usuarios:login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" class="btn btn-outline-secondary">Ya tengo cuenta</a>
       </div>
     </form>
   </div>
