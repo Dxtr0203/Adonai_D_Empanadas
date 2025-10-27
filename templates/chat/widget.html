@@ -20,6 +20,7 @@
       </div>
     </div>
     <div id="chat-messages" class="card-body" style="overflow:auto;height:300px;background:#f8f9fa"></div>
+    <div id="chat-options" class="mt-0" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;"></div>
     <div class="card-footer">
       <div class="input-group">
         <input id="chat-input" type="text" class="form-control" placeholder="Escribe tu mensaje...">
@@ -28,6 +29,17 @@
     </div>
   </div>
 </div>
+
+<!-- Ajuste del estilo para reducir el espacio entre el texto y los botones -->
+<style>
+  /* Ajustar el espaciado entre el texto y los botones */
+  .chat-options {
+    margin-top: 5px; /* Reducir el margen superior */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px; /* Reducir el espacio entre botones */
+  }
+</style>
 
 <script src="{% static 'js/chat_widget.js' %}"></script>
 
