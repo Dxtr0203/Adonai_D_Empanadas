@@ -250,5 +250,32 @@ document.getElementById('bell-btn').addEventListener('click', function (e) {
   dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
 });
 </script>
+<script>
+// Auto-filter helper used by catalog and any page that includes
+// inputs with ids `filter-q` and `filter-categoria`.
+(function(){
+  function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  function submitFilterIfPresent(){
+    try{
+      const q = document.getElementById('filter-q');
+      const cat = document.getElementById('filter-categoria');
+      if(!q && !cat) return;
+      // Find the closest form to either element
+      const form = (q && q.closest('form')) || (cat && cat.closest('form'));
+      if(!form) return;
+      form.submit();
+    }catch(e){ console.error('auto-filter error', e); }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const q = document.getElementById('filter-q');
+    const cat = document.getElementById('filter-categoria');
+    const submitDebounced = debounce(submitFilterIfPresent, 500);
+    if(q){ q.addEventListener('input', submitDebounced); }
+    if(cat){ cat.addEventListener('change', submitFilterIfPresent); }
+  });
+})();
+</script>
 </body>
 </html>
