@@ -30,9 +30,10 @@
         <tr>
           <th>Producto</th>
           <th>Categoría</th>
-          <th class="text-end">Precio</th>
-          <th class="text-center">Stock</th>
-          <th style="width: 170px;"></th>
+          <th style="width:140px;">Vencimiento</th>
+          <th class="text-end" style="width:120px;">Precio</th>
+          <th class="text-center" style="width:100px;">Stock</th>
+          <th style="width:170px;"></th>
         </tr>
       </thead>
       <tbody>
@@ -40,6 +41,13 @@
         <tr>
           <td>{{ p.nombre }}</td>
           <td>{{ p.categoria.nombre }}</td>
+          <td>
+            {% if p.fecha_vencimiento %}
+              {{ p.fecha_vencimiento|date:"d/m/Y" }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
           <td class="text-end">{{ p.precio|floatformat:2 }}</td>
           <td class="text-center">
             {% if p.stock_actual <= p.stock_minimo %}
@@ -48,13 +56,14 @@
               <span class="badge bg-success">{{ p.stock_actual }}</span>
             {% endif %}
           </td>
+          
           <td class="text-end">
             <a class="btn btn-sm btn-outline-primary" href="{% url 'panel:producto_update' p.id %}">Editar</a>
             <a class="btn btn-sm btn-outline-danger" href="{% url 'panel:producto_delete' p.id %}">Eliminar</a>
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="5" class="text-center text-muted py-4">Sin productos.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">Sin productos.</td></tr>
       {% endfor %}
       </tbody>
     </table>
