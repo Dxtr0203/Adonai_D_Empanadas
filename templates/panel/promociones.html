@@ -1,0 +1,170 @@
+{% extends 'panel/base_panel.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+  .promo-img { height: 60px; }
+  .visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; }
+</style>
+<h1>Promociones - Productos por vencer (30 días)</h1>
+<p>Listado de productos cuya fecha de vencimiento está dentro de los próximos 30 días. Selecciona el tipo de promoción para cada producto y presiona "Crear promociones".</p>
+<form method="post">
+  {% csrf_token %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Imagen</th>
+        <th>Seleccionar</th>
+        <th>Producto</th>
+        <th>Vence</th>
+        <th>Días restantes</th>
+        <th>Tipo de promoción</th>
+        <th>Descuento (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in productos %}
+      <tr>
+        <td>
+          {% if p.imagen %}
+            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}" class="promo-img" />
+          {% else %}
+            <img src="{% static 'img/no-image.png' %}" alt="sin imagen" class="promo-img" />
+          {% endif %}
+        </td>
+        <td>
+          <input type="checkbox" name="apply_{{ p.pk }}" id="apply_{{ p.pk }}" />
+          <label for="apply_{{ p.pk }}" class="visually-hidden">Seleccionar {{ p.nombre }}</label>
+        </td>
+        <td>{{ p.nombre }}</td>
+        <td>{{ p.fecha_vencimiento }}</td>
+        <td>{{ p.fecha_vencimiento|timeuntil:hoy }}</td>
+        <td>
+          <div role="radiogroup" aria-labelledby="promo_type_label_{{ p.pk }}">
+            <input type="radio" name="promo_type_{{ p.pk }}" id="promo_none_{{ p.pk }}" value="none" checked /> <label for="promo_none_{{ p.pk }}">Ninguna</label><br />
+            <input type="radio" name="promo_type_{{ p.pk }}" id="promo_2x1_{{ p.pk }}" value="2x1" /> <label for="promo_2x1_{{ p.pk }}">2x1</label><br />
+            <input type="radio" name="promo_type_{{ p.pk }}" id="promo_desc_{{ p.pk }}" value="descuento" /> <label for="promo_desc_{{ p.pk }}">Descuento</label><br />
+            <input type="radio" name="promo_type_{{ p.pk }}" id="promo_oferta_{{ p.pk }}" value="oferta" /> <label for="promo_oferta_{{ p.pk }}">Oferta especial</label>
+          </div>
+        </td>
+        <td>
+          <input type="number" step="1" min="0" max="100" name="descuento_{{ p.pk }}" class="form-control descuento-input" placeholder="ej. 20" aria-label="Descuento para {{ p.nombre }}" />
+        </td>
+        <td>
+          <input type="text" name="offer_detail_{{ p.pk }}" class="form-control offer-detail" placeholder="Detalle de oferta (ej. Regalo X)" aria-label="Detalle oferta para {{ p.nombre }}" />
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7">No hay productos próximos a vencer en los próximos 30 días.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button type="submit" class="btn btn-primary">Crear promociones</button>
+</form>
+
+<!-- Tabla de promociones internas existentes -->
+<hr />
+<h2>Promociones creadas</h2>
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Producto</th>
+      <th>Tipo de Promocion</th>
+      <th>Detalle</th>
+      <th>Inicio</th>
+      <th>Fin</th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for promo in promociones_existentes %}
+      <tr>
+        <td>{{ promo.producto.nombre }}</td>
+        <td>
+          {% if promo.tipo == 'descuento' and promo.discount_percent %}
+            {{ promo.get_tipo_display }} ({{ promo.discount_percent }}%)
+          {% else %}
+            {{ promo.get_tipo_display }}
+          {% endif %}
+        </td>
+        <td>
+          {% if promo.dias_restantes is not None %}
+            {% if promo.dias_restantes == 0 %}
+              Expirado
+            {% else %}
+              {{ promo.dias_restantes }} días
+            {% endif %}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ promo.promotion_start }}</td>
+        <td>{{ promo.promotion_end }}</td>
+        <td>{{ promo.get_status_display }}</td>
+        <td>
+          {# Toggle habilitar/deshabilitar #}
+          <form method="post" action="{% url 'panel:promociones_toggle' promo.pk %}" class="d-inline">
+            {% csrf_token %}
+            {% if promo.status == 'approved' %}
+              <button type="submit" class="btn btn-sm btn-outline-warning">Deshabilitar</button>
+            {% else %}
+              <button type="submit" class="btn btn-sm btn-outline-success">Habilitar</button>
+            {% endif %}
+          </form>
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'panel:promociones_delete' promo.pk %}">Eliminar</a>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7">No hay promociones creadas aún.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  // Toggle discount / offer fields depending on selected promo type per product row
+  document.addEventListener('DOMContentLoaded', function() {
+    function updateRow(pk) {
+      const tipoName = 'promo_type_' + pk;
+      const radios = document.getElementsByName(tipoName);
+      const descuento = document.getElementsByName('descuento_' + pk)[0];
+      const offer = document.getElementsByName('offer_detail_' + pk)[0];
+      if (!radios || !descuento) return;
+      let selected = 'none';
+      for (let r of radios) {
+        if (r.checked) { selected = r.value; break; }
+      }
+      if (selected === 'descuento') {
+        descuento.removeAttribute('disabled');
+        descuento.step = '1';
+        descuento.value = descuento.value ? parseInt(descuento.value) : '';
+        if (offer) offer.setAttribute('disabled','disabled');
+      } else if (selected === '2x1') {
+        descuento.setAttribute('disabled','disabled');
+        if (offer) offer.setAttribute('disabled','disabled');
+      } else if (selected === 'oferta') {
+        descuento.setAttribute('disabled','disabled');
+        if (offer) offer.removeAttribute('disabled');
+      } else {
+        descuento.setAttribute('disabled','disabled');
+        if (offer) offer.setAttribute('disabled','disabled');
+      }
+    }
+
+    // Initialize for all products present on the page
+    const promoRows = document.querySelectorAll('input[name^="promo_type_"]');
+    const pks = new Set();
+    promoRows.forEach(function(r){
+      const name = r.name; // promo_type_<pk>
+      const pk = name.split('_').pop();
+      pks.add(pk);
+    });
+    pks.forEach(function(pk){
+      updateRow(pk);
+      // attach change listeners to radios
+      const radios = document.getElementsByName('promo_type_' + pk);
+      radios.forEach(function(rd){ rd.addEventListener('change', function(){ updateRow(pk); }); });
+    });
+  });
+</script>
+{% endblock %}
