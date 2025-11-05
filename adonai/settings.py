@@ -73,7 +73,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'adonai_store',  # Nombre de la base de datos
         'USER': 'root',  # Usuario para la base de datos
-        'PASSWORD': 'dexter123',  # Contraseña de la base de datos
+        'PASSWORD': '123456',  # Contraseña de la base de datos
         'HOST': 'localhost',
         'PORT': '3306',
     }
