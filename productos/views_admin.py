@@ -62,7 +62,10 @@ def producto_create(request):
         form = ProductoForm(request.POST, request.FILES)
         if form.is_valid():
             p = form.save()
-            messages.success(request, f"Producto «{p.nombre}» creado.")
+            if p.imagen:
+                messages.success(request, f"Producto «{p.nombre}» creado. Imagen guardada: {p.imagen.name}")
+            else:
+                messages.success(request, f"Producto «{p.nombre}» creado.")
             return redirect("panel:inventario_list")
         messages.error(request, "Revisa los errores del formulario.")
     else:
@@ -78,7 +81,10 @@ def producto_update(request, pk):
         form = ProductoForm(request.POST, request.FILES, instance=p)
         if form.is_valid():
             form.save()
-            messages.success(request, f"Producto «{p.nombre}» actualizado.")
+            if p.imagen:
+                messages.success(request, f"Producto «{p.nombre}» actualizado. Imagen guardada: {p.imagen.name}")
+            else:
+                messages.success(request, f"Producto «{p.nombre}» actualizado.")
             return redirect("panel:inventario_list")
         messages.error(request, "Revisa los errores del formulario.")
     else:

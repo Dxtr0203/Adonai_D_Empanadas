@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # === Seguridad / Debug (solo dev) ===
 SECRET_KEY = 'django-insecure-kfxcl-@8q4l=r8!c-)rb20w+cp&&8m&suw-$c^1=^fo+ar47)-'
-DEBUG = False  # Cambiar a False en producción
+DEBUG = True  # Durante desarrollo activa el modo DEBUG para servir media estático. Cambiar a False en producción
 # En desarrollo permitir hosts locales y 'testserver' para las pruebas con Client()
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']  # Aquí puedes agregar los dominios permitidos cuando esté en producción
 
