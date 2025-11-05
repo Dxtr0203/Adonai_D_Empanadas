@@ -51,6 +51,7 @@
     <a href="{% url 'panel:categoria_list' %}" class="{% if 'categorias' in request.path %}active{% endif %}">Categorías</a>
   <a href="{% url 'panel:empleado_list' %}" class="{% if 'empleados' in request.path %}active{% endif %}">Empleados</a>
   <a href="{% url 'panel:cliente_list' %}" class="{% if 'clientes' in request.path %}active{% endif %}">Clientes</a>
+  <a href="{% url 'panel:promociones' %}" class="{% if 'promociones' in request.path %}active{% endif %}">Promociones</a>
     <hr>
     <a href="{% url 'catalogo' %}">Ver Tienda</a>
     {% if request.user.is_authenticated %}

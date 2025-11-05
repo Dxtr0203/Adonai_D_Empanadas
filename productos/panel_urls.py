@@ -26,6 +26,11 @@ urlpatterns = [
     path("empleados/<int:pk>/eliminar/", views.empleado_delete, name="empleado_delete"),
     # Clientes
     path("clientes/", views.cliente_list, name="cliente_list"),
+    # Promociones: productos que expiran en 30 días
+    path("promociones/", views.promociones_list, name="promociones"),
+    path("promociones/<int:pk>/editar/", views.promociones_edit, name="promociones_edit"),
+    path("promociones/<int:pk>/toggle/", views.promociones_toggle, name="promociones_toggle"),
+    path("promociones/<int:pk>/eliminar/", views.promociones_delete, name="promociones_delete"),
     # Area para empleados (limitada)
     path("empleados/area/", views_emp.empleado_dashboard, name="empleado_area_dashboard"),
     path("empleados/area/inventario/", views_emp.empleado_inventario, name="empleado_area_inventario"),

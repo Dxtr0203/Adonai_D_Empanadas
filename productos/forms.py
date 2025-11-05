@@ -1,6 +1,24 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import Producto, Categoria
+from django.forms import ModelForm
+from .models import Promotion
+
+
+class PromotionForm(ModelForm):
+    class Meta:
+        model = Promotion
+        # Expose editable fields; producto shown but disabled in template
+        fields = ['producto', 'tipo', 'discount_percent', 'recommended_reason', 'promotion_start', 'promotion_end', 'status']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make producto readonly in the form (show only)
+        if 'producto' in self.fields:
+            self.fields['producto'].disabled = True
+        # Configure discount field to be integer-only in the form
+        if 'discount_percent' in self.fields:
+            self.fields['discount_percent'].widget.attrs.update({'step': '1'})
 
 MAX_IMG_MB = 2
 ALLOWED_IMG_TYPES = {"image/jpeg", "image/png", "image/webp"}

@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q, F
 
-from .models import Producto, Categoria
+from .models import Producto, Categoria, Promocion, Promotion
 from .forms import ProductoForm, CategoriaForm
 from usuarios.decorators import group_required
 # productos/views_admin.py
@@ -169,6 +169,206 @@ def cliente_list(request):
 
     qs = Usuario.objects.filter(rol__nombre__iexact='Cliente').order_by('-creado_en')
     return render(request, 'panel/cliente_list.html', {'clientes': qs})
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def promociones_list(request):
+    """Muestra productos cuya `fecha_vencimiento` esté dentro de los próximos 30 días
+    y permite crear entradas en la tabla `promociones` seleccionando el tipo de promoción.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    hoy = timezone.localdate()
+    limite = hoy + timedelta(days=30)
+
+    productos = Producto.objects.filter(fecha_vencimiento__isnull=False,
+                                         fecha_vencimiento__range=(hoy, limite),
+                                         estado='activo')
+
+    if request.method == 'POST':
+        # Procesar las promociones seleccionadas
+        created = 0
+        skipped = 0
+        for p in productos:
+            apply_key = f'apply_{p.pk}'
+            if apply_key not in request.POST:
+                continue
+
+            key = f'promo_type_{p.pk}'
+            tipo = request.POST.get(key)
+            if not tipo or tipo == 'none':
+                continue
+
+            # Preparar campos para la tabla promociones
+            nombre = f"Promo - {p.nombre}"
+            descripcion = f"Promoción automática para producto que vence {p.fecha_vencimiento}. Tipo: {tipo}"
+            descuento_val = None
+            if tipo == 'descuento':
+                # leer descuento opcional
+                try:
+                    descuento_val = request.POST.get(f'descuento_{p.pk}')
+                    if descuento_val:
+                        descuento_val = float(descuento_val)
+                except Exception:
+                    descuento_val = None
+
+            # Rango de fechas: inicio hoy, fin el día de vencimiento
+            fecha_inicio = hoy
+            fecha_fin = p.fecha_vencimiento
+            # Evitar duplicados:
+            # Evitar duplicados: sólo comprobamos promociones internas vinculadas al mismo producto
+            already_exists = False
+            try:
+                already_exists = Promotion.objects.filter(
+                    producto=p,
+                ).filter(
+                    promotion_end__gte=fecha_inicio,
+                    promotion_start__lte=fecha_fin,
+                ).filter(status__in=['approved', 'pending']).exists()
+            except Exception:
+                already_exists = False
+
+            if already_exists:
+                skipped += 1
+                continue
+
+            # Crear registro en la tabla externa `promociones` (si existe) — no la usamos para bloqueo
+            try:
+                Promocion.objects.create(
+                    nombre=nombre,
+                    descripcion=descripcion,
+                    descuento=descuento_val,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                    activo='si'
+                )
+            except Exception:
+                # No interrumpir por fallos en la tabla externa
+                pass
+
+            # Crear también la promoción interna ligada al producto
+            try:
+                # Mapear request.user a usuarios.Usuario si existe
+                creador = None
+                try:
+                    creador = Usuario.objects.filter(email__iexact=request.user.email).first()
+                except Exception:
+                    creador = None
+
+                # Server-side: si es descuento, forzar entero
+                if tipo == 'descuento' and descuento_val is not None:
+                    try:
+                        descuento_val = int(float(descuento_val))
+                    except Exception:
+                        descuento_val = None
+
+                Promotion.objects.create(
+                    producto=p,
+                    creado_por=creador,
+                    tipo=tipo,
+                    discount_percent=descuento_val,
+                    recommended_reason=descripcion,
+                    promotion_start=fecha_inicio,
+                    promotion_end=fecha_fin,
+                    status='approved' if tipo in ('2x1', 'descuento', 'oferta') else 'pending'
+                )
+            except Exception:
+                # Ignorar errores individuales
+                pass
+
+            created += 1
+
+        msgs = []
+        if created:
+            msgs.append(f'{created} promoción(es) creada(s).')
+        if skipped:
+            msgs.append(f'{skipped} promoción(es) omitida(s) por duplicados.')
+        if msgs:
+            messages.success(request, ' '.join(msgs))
+        else:
+            messages.info(request, 'No se crearon promociones. Selecciona al menos una.')
+        return redirect('panel:promociones')
+
+    # También listar promociones internas existentes para edición/eliminación
+    try:
+        # Obtener promociones y calcular días restantes hasta promotion_end (0 si ya expiró)
+        promociones_existentes = list(Promotion.objects.select_related('producto').order_by('-creado_en'))
+        for promo in promociones_existentes:
+            dias = None
+            try:
+                if promo.promotion_end:
+                    dias = (promo.promotion_end - hoy).days
+            except Exception:
+                dias = None
+            # Normalizar: si dias es negativo considerarlo expirado (0 días restantes)
+            if dias is None:
+                promo.dias_restantes = None
+            else:
+                promo.dias_restantes = dias if dias >= 0 else 0
+    except Exception:
+        promociones_existentes = []
+
+    return render(request, 'panel/promociones.html', {
+        'productos': productos,
+        'hoy': hoy,
+        'limite': limite,
+        'promociones_existentes': promociones_existentes,
+    })
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def promociones_edit(request, pk):
+    """Editar una promoción interna (modelo Promotion)."""
+    p = get_object_or_404(Promotion, pk=pk)
+    from .forms import PromotionForm
+    if request.method == 'POST':
+        form = PromotionForm(request.POST, instance=p)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Promoción actualizada.')
+            return redirect('panel:promociones')
+        messages.error(request, 'Corrige los errores del formulario.')
+    else:
+        form = PromotionForm(instance=p)
+    return render(request, 'panel/promocion_edit.html', {'form': form, 'promocion': p})
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def promociones_delete(request, pk):
+    """Eliminar una promoción interna."""
+    p = get_object_or_404(Promotion, pk=pk)
+    if request.method == 'POST':
+        nombre = str(p)
+        p.delete()
+        messages.success(request, f'Promoción «{nombre}» eliminada.')
+        return redirect('panel:promociones')
+    return render(request, 'panel/confirm_delete.html', {'obj': p, 'tipo': 'Promoción'})
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def promociones_toggle(request, pk):
+    """Alterna el estado de una promoción interna entre 'approved' y 'rejected'."""
+    p = get_object_or_404(Promotion, pk=pk)
+    # Solo aceptar POST para cambiar estado
+    if request.method == 'POST':
+        try:
+            if p.status == 'approved':
+                p.status = 'rejected'
+                msg = 'Promoción deshabilitada.'
+            else:
+                p.status = 'approved'
+                msg = 'Promoción habilitada.'
+            p.save()
+            messages.success(request, msg)
+        except Exception as e:
+            messages.error(request, f'Error al cambiar el estado: {e}')
+        return redirect('panel:promociones')
+    # Si se accede por GET mostrar confirmación simple
+    return render(request, 'panel/confirm_toggle.html', {'obj': p})
 
 
 @login_required
