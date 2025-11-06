@@ -9,4 +9,5 @@ urlpatterns = [
     path('webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('pago/exito/', views.pago_exito, name='pago_exito'),
     path('pago/error/', views.pago_error, name='pago_error'),
+    path('pago/recibo/<str:session_id>/', views.recibo_pdf, name='recibo'),
 ]

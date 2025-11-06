@@ -8,6 +8,11 @@
   <body>
     <h1>¡Pago Exitoso!</h1>
     <p>Gracias. Tu pago se procesó correctamente.</p>
+    {% if session_id %}
+      <p>Puedes descargar tu recibo aquí:
+        <a href="{% url 'pagos:recibo' session_id %}">Descargar recibo (PDF)</a>
+      </p>
+    {% endif %}
     <a href="/">Volver al inicio</a>
   </body>
 </html>

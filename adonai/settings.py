@@ -155,3 +155,5 @@ STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51SQIYyA0jLs58U
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_51SQIYyA0jLs58UPdgqD2EtspLJuroSvM4NObjgzwfxVdLwa1cjS5ZgTcn8F2N9rM5iCDyqUsGpyEg9yvdKXpCkAr0000AyIQ5z')
 # Opcional: secreto para verificar firmas de webhook (recomendado en producción)
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+# Tipo de cambio por defecto BOB -> USD (1 BOB = X USD). Ajusta según tu fuente de cambio.
+STRIPE_BOB_TO_USD_RATE = float(os.environ.get('STRIPE_BOB_TO_USD_RATE', '0.145'))
