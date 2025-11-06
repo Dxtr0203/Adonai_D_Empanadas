@@ -47,6 +47,12 @@
     {% if form.imagen.errors %}<div class="text-danger small">{{ form.imagen.errors|striptags }}</div>{% endif %}
   </div>
 
+  <div class="col-md-3">
+    <label class="form-label">Fecha de vencimiento</label>
+    {{ form.fecha_vencimiento }}
+    {% if form.fecha_vencimiento.errors %}<div class="text-danger small">{{ form.fecha_vencimiento.errors|striptags }}</div>{% endif %}
+  </div>
+
   <div class="col-12">
     {# Mostrar imagen actual si existe (modo editar) #}
     {% if form.instance and form.instance.imagen %}

@@ -1,6 +1,24 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import Producto, Categoria
+from django.forms import ModelForm
+from .models import Promotion
+
+
+class PromotionForm(ModelForm):
+    class Meta:
+        model = Promotion
+        # Expose editable fields; producto shown but disabled in template
+        fields = ['producto', 'tipo', 'discount_percent', 'recommended_reason', 'promotion_start', 'promotion_end', 'status']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make producto readonly in the form (show only)
+        if 'producto' in self.fields:
+            self.fields['producto'].disabled = True
+        # Configure discount field to be integer-only in the form
+        if 'discount_percent' in self.fields:
+            self.fields['discount_percent'].widget.attrs.update({'step': '1'})
 
 MAX_IMG_MB = 2
 ALLOWED_IMG_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -8,7 +26,7 @@ ALLOWED_IMG_TYPES = {"image/jpeg", "image/png", "image/webp"}
 class ProductoForm(forms.ModelForm):
     class Meta:
         model = Producto
-        fields = ["categoria", "nombre", "descripcion", "precio", "stock_minimo", "stock_actual", "imagen"]
+        fields = ["categoria", "nombre", "descripcion", "precio", "stock_minimo", "stock_actual", "imagen", "fecha_vencimiento"]
         widgets = {
             "categoria": forms.Select(attrs={"class": "form-select", "required": True}),
             "nombre": forms.TextInput(attrs={"class": "form-control", "required": True, "minlength": 2, "maxlength": 120}),
@@ -18,6 +36,7 @@ class ProductoForm(forms.ModelForm):
             "stock_actual": forms.NumberInput(attrs={"class": "form-control", "required": True, "min": "0", "step": "1"}),
             # Asegúrate de que el campo de imagen tenga las extensiones adecuadas
             "imagen": forms.FileInput(attrs={"class": "form-control", "accept": ".jpg,.jpeg,.png,.webp"}),
+            "fecha_vencimiento": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
         }
 
     def clean_nombre(self):
@@ -64,6 +83,8 @@ class ProductoForm(forms.ModelForm):
         if sm is not None and sa is not None and sm > sa:
             # puedes hacer warning, pero mejor forzar
             self.add_error("stock_minimo", "El stock mínimo no puede ser mayor que el stock actual.")
+        # Validación simple de fecha de vencimiento: si existe, puede ser futura o pasada según negocio
+        # (Dejar sin validación estricta aquí; ajustar si se requiere que sea >= hoy)
         return data
 
 class CategoriaForm(forms.ModelForm):

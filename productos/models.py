@@ -21,10 +21,12 @@ class Producto(models.Model):
     precio = models.DecimalField(max_digits=10, decimal_places=2)
     stock_minimo = models.IntegerField(default=0)
     stock_actual = models.IntegerField(default=0)
-    estado = models.CharField(max_length=10, choices=(('activo','activo'),('inactivo','inactivo')), default='activo')
+    estado = models.CharField(max_length=8, choices=(('activo','activo'),('inactivo','inactivo')), default='activo')
     
     # Cambiar CharField a ImageField para manejar imágenes de productos
     imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
+    # Fecha de vencimiento para inventario 
+    fecha_vencimiento = models.DateField(null=True, blank=True)
     
     creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_creados', db_column='creado_por')
     actualizado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='productos_actualizados', db_column='actualizado_por')
@@ -88,6 +90,57 @@ class NotificationRead(models.Model):
 
     class Meta:
         unique_together = ('notification', 'user')
+
+
+class Promotion(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pendiente'),
+        ('approved', 'Aprobada'),
+        ('rejected', 'Rechazada'),
+    )
+
+    TIPO_CHOICES = (
+        ('2x1', '2x1'),
+        ('descuento', 'Descuento'),
+        ('oferta', 'Oferta especial'),
+    )
+
+    # Use db_constraint=False because `Producto` maps to a legacy table
+    # whose primary key column attributes (e.g. unsigned) may not match
+    # Django's default FK creation on MySQL. Avoid DB-level FK to prevent
+    # incompatibility errors while keeping the relation at the ORM level.
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, db_constraint=False)
+    creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, db_constraint=False)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='descuento')
+    discount_percent = models.IntegerField(null=True, blank=True)
+    recommended_reason = models.TextField(blank=True, null=True)
+    promotion_start = models.DateField(null=True, blank=True)
+    promotion_end = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Promo {self.producto.nombre} - {self.get_tipo_display()} ({self.get_status_display()})"
+
+    class Meta:
+        ordering = ('-creado_en',)
+
+
+# Modelo que mapea a la tabla externa `promociones` (managed=False porque ya existe en la DB)
+class Promocion(models.Model):
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(blank=True, null=True)
+    descuento = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    fecha_inicio = models.DateField(null=True, blank=True)
+    fecha_fin = models.DateField(null=True, blank=True)
+    activo = models.CharField(max_length=2, choices=(('si','si'),('no','no')), default='si')
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 'promociones'
+        managed = False
 
 
 # Crear notificación automáticamente al crear un producto
