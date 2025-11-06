@@ -151,11 +151,7 @@ SITE_ID = int(os.environ.get('SITE_ID', 1))
 # === Stripe configuration (leer desde .env o variables de entorno)
 # En desarrollo coloca tus claves de prueba en el archivo .env o exporta las variables:
 # STRIPE_PUBLIC_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
-
-# Stripe keys (seguras con variables de entorno)
-STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', 'pk_test_51SQIYyA0jLs58UPdpMusu84oPczqJyMNiay98yKVA4CoUU1hnW8fQIMV4QAnom5X3fPukyU0YJVUwNbtf6BK5sIy00CeLiOIax')
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
-
-
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51SQIYyA0jLs58UPdpMusu84oPczqJyMNiay98yKVA4CoUU1hnW8fQIMV4QAnom5X3fPukyU0YJVUwNbtf6BK5sIy00CeLiOIax')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_51SQIYyA0jLs58UPdgqD2EtspLJuroSvM4NObjgzwfxVdLwa1cjS5ZgTcn8F2N9rM5iCDyqUsGpyEg9yvdKXpCkAr0000AyIQ5z')
 # Opcional: secreto para verificar firmas de webhook (recomendado en producción)
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
