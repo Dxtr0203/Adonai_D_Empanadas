@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'chat',
     'core',
     'roles',  # Agregar la app de roles
+    'pagos',
     'django.contrib.sites',
 ]
 
@@ -73,7 +74,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'adonai_store',  # Nombre de la base de datos
         'USER': 'root',  # Usuario para la base de datos
-        'PASSWORD': 'dexter123',  # Contraseña de la base de datos
+        'PASSWORD': '123456',  # Contraseña de la base de datos
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -146,3 +147,11 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@adonai.local
 
 # Sites framework (necesario para construir enlaces con dominio)
 SITE_ID = int(os.environ.get('SITE_ID', 1))
+
+# === Stripe configuration (leer desde .env o variables de entorno)
+# En desarrollo coloca tus claves de prueba en el archivo .env o exporta las variables:
+# STRIPE_PUBLIC_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51SQIYyA0jLs58UPdpMusu84oPczqJyMNiay98yKVA4CoUU1hnW8fQIMV4QAnom5X3fPukyU0YJVUwNbtf6BK5sIy00CeLiOIax')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_51SQIYyA0jLs58UPdgqD2EtspLJuroSvM4NObjgzwfxVdLwa1cjS5ZgTcn8F2N9rM5iCDyqUsGpyEg9yvdKXpCkAr0000AyIQ5z')
+# Opcional: secreto para verificar firmas de webhook (recomendado en producción)
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')

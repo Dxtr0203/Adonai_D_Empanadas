@@ -1,0 +1,92 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Checkout - Pagar con Stripe</title>
+    <script src="https://js.stripe.com/v3/"></script>
+  </head>
+  <body>
+    <div class="container py-4">
+      <h1>Checkout</h1>
+      <div id="cart-summary">
+        <p id="no-items">No hay productos en el carrito.</p>
+        <p id="cart-total" style="display:none">Total: <strong>$<span id="total-amount">0.00</span> USD</strong></p>
+      </div>
+
+      <button id="checkout-button" disabled>Pagar con Stripe</button>
+    </div>
+
+    <script>
+      const stripePublicKey = '{{ stripe_public_key }}';
+
+      function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+      const stripe = Stripe(stripePublicKey);
+
+      // Calcular total a partir del carrito en localStorage (asume precios numéricos)
+      function computeCartTotalCents() {
+        const cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let total = 0.0;
+        cart.forEach(item => {
+          const price = parseFloat(item.precio) || 0;
+          const qty = parseInt(item.cantidad) || 1;
+          total += price * qty;
+        });
+        // total asume la misma unidad que se desea cobrar (USD). Convertir a centavos
+        return Math.round(total * 100);
+      }
+
+      // Mostrar total en la página y habilitar el botón si hay items
+      (function showTotal() {
+        const cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const btn = document.getElementById('checkout-button');
+        if (cart.length === 0) {
+          document.getElementById('no-items').style.display = 'block';
+          document.getElementById('cart-total').style.display = 'none';
+          btn.disabled = true;
+          return;
+        }
+        const cents = computeCartTotalCents();
+        const dollars = (cents / 100).toFixed(2);
+        document.getElementById('total-amount').innerText = dollars;
+        document.getElementById('no-items').style.display = 'none';
+        document.getElementById('cart-total').style.display = 'block';
+        btn.disabled = false;
+      })();
+
+      document.getElementById('checkout-button').addEventListener('click', function () {
+        const amount_cents = computeCartTotalCents();
+        fetch('{% url "pagos:create_checkout_session" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: JSON.stringify({ amount_cents: amount_cents })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) { alert('Error: ' + data.error); return; }
+          return stripe.redirectToCheckout({ sessionId: data.id });
+        })
+        .then(result => { if (result && result.error) alert(result.error.message); })
+        .catch(err => { console.error(err); alert('Error inesperado'); });
+      });
+    </script>
+  </body>
+</html>

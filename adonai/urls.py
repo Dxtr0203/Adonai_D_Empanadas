@@ -23,6 +23,8 @@ urlpatterns = [
     path('carrito/', include('carrito.urls')),
     # Endpoints del chat (widget)
     path('chat/', include('chat.urls')),
+    # Pagos (Stripe)
+    path('', include(('pagos.urls', 'pagos'), namespace='pagos')),
 
 ]
 

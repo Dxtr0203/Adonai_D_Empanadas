@@ -6,10 +6,8 @@
   <h1 class="h3">Checkout</h1>
   <p>Aquí revisarás tu pedido y completarás la compra.</p>
   <div id="checkout-cart"></div>
-  <form method="post" action="">
-    {% csrf_token %}
-    <button class="btn btn-success">Pagar ahora</button>
-  </form>
+  <!-- Redirigir al checkout de Stripe implementado en la app `pagos` -->
+  <a href="{% url 'pagos:checkout' %}" class="btn btn-success">Pagar ahora</a>
 </div>
 
 <script>
