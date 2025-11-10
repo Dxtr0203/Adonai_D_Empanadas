@@ -33,6 +33,9 @@ INSTALLED_APPS = [
     'django.contrib.sites',
 ]
 
+# Evitar warning sobre primary key auto-creada en modelos antiguos
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 # === Middleware ===
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
