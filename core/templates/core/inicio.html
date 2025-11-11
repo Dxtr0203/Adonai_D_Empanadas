@@ -97,4 +97,30 @@
   </div>
 </div>
 
+<!-- Sección Historial de Compras -->
+{% if user.is_authenticated and historial_compras %}
+<div class="container py-5">
+  <h2 class="h4">Historial de Compras</h2>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Monto</th>
+        <th>Estado</th>
+        <th>Método de Pago</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for compra in historial_compras %}
+      <tr>
+        <td>{{ compra.created_at|date:"d/m/Y H:i" }}</td>
+        <td>{{ compra.amount_cents|floatformat:2 }} USD</td>
+        <td>{{ compra.get_status_display }}</td>
+        <td>{{ compra.currency|title }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 {% endblock %}

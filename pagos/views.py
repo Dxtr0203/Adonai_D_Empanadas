@@ -1,16 +1,18 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 import stripe
 import json
+import io
+import pytz
+from decimal import Decimal, ROUND_HALF_UP
 
 from .models import Payment
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-import io
+
+# Intentar importar reportlab
 try:
-    # reportlab is preferred for PDF generation
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
     REPORTLAB_AVAILABLE = True
@@ -20,9 +22,11 @@ except Exception:
 
 def checkout_view(request):
     public_key = getattr(settings, 'STRIPE_PUBLIC_KEY', '')
-    # Pasar la tasa de conversión para que el frontend pueda mostrar el total convertido
     bob_to_usd = getattr(settings, 'STRIPE_BOB_TO_USD_RATE', 0.145)
-    return render(request, 'pagos/checkout.html', {'stripe_public_key': public_key, 'bob_to_usd': bob_to_usd})
+    return render(request, 'pagos/checkout.html', {
+        'stripe_public_key': public_key,
+        'bob_to_usd': bob_to_usd
+    })
 
 
 def create_checkout_session(request):
@@ -31,40 +35,34 @@ def create_checkout_session(request):
 
     stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
     domain = 'http://localhost:8000'
-    # Leer el body JSON para obtener amount_cents (en centavos)
+
     try:
         payload = json.loads(request.body.decode('utf-8') or '{}')
     except Exception:
         payload = {}
 
-    # Esperamos recibir el monto en BOB desde el frontend: {'amount_bob': 123.45}
     amount_bob = payload.get('amount_bob')
     try:
-        amount_bob = float(amount_bob) if amount_bob is not None else None
+        amount_bob = Decimal(str(amount_bob)) if amount_bob is not None else None
     except (ValueError, TypeError):
         return JsonResponse({'error': 'amount_bob inválido'}, status=400)
 
     if amount_bob is None:
         return JsonResponse({'error': 'amount_bob requerido'}, status=400)
 
-    # Convertir BOB -> USD usando la tasa en settings
-    from decimal import Decimal, ROUND_HALF_UP
-    rate = Decimal(str(getattr(settings, 'STRIPE_BOB_TO_USD_RATE', 0.145)))
-    usd_amount = (Decimal(str(amount_bob)) * rate)
-    amount_cents = int((usd_amount * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    # Usar el monto exacto en BOB sin ajustes
+    amount_cents = int(amount_bob * 100)
 
-    # Simple validación para evitar montos negativos/excesivos (max 1,000,000 USD -> 100,000,000 cents)
     if amount_cents <= 0 or amount_cents > 100000000:
         return JsonResponse({'error': 'amount fuera de rango'}, status=400)
 
     try:
-        # Incluir el CHECKOUT_SESSION_ID en la URL de éxito para poder enlazar al recibo
         success_url = domain + '/pago/exito/?session_id={CHECKOUT_SESSION_ID}'
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': 'bob',  # Usar BOB directamente si Stripe lo permite
                     'product_data': {'name': 'Compra desde Adonai'},
                     'unit_amount': amount_cents,
                 },
@@ -75,9 +73,13 @@ def create_checkout_session(request):
             cancel_url=domain + '/pago/error/',
         )
 
-        # Guardar registro del pago (si la tabla existe)
         try:
-            Payment.objects.create(stripe_session_id=session.id, amount_cents=amount_cents, currency='usd', status='created')
+            Payment.objects.create(
+                stripe_session_id=session.id,
+                amount_cents=amount_cents,
+                currency='bob',  # Usar BOB directamente
+                status='created'
+            )
         except Exception:
             pass
 
@@ -87,7 +89,6 @@ def create_checkout_session(request):
 
 
 def pago_exito(request):
-    # Intentar obtener el session_id desde la querystring (establecido en success_url)
     session_id = request.GET.get('session_id')
     return render(request, 'pagos/exito.html', {'session_id': session_id})
 
@@ -126,56 +127,52 @@ def stripe_webhook(request):
                 p.save()
             except Payment.DoesNotExist:
                 try:
-                    Payment.objects.create(stripe_session_id=session_id, amount_cents=1000, currency='usd', status='paid', raw_event=json.dumps(event))
+                    Payment.objects.create(
+                        stripe_session_id=session_id,
+                        amount_cents=1000,
+                        currency='usd',
+                        status='paid',
+                        raw_event=json.dumps(event)
+                    )
                 except Exception:
                     pass
 
     return JsonResponse({'received': True})
 
 
-import json
-from decimal import Decimal
-import pytz
-
 def recibo_pdf(request, session_id: str):
-    """Genera y devuelve un PDF de recibo para el Payment identificado por session_id.
-
-    Intenta obtener la información desde la BD (modelo Payment). Si no existe, consulta
-    la sesión en Stripe para recuperar detalles (líneas, cliente, monto, método de pago).
-    """
-    # Intentar obtener información del pago desde la BD; si no existe, solicitar a Stripe
+    """Genera un PDF de recibo con hora local de Bolivia (BOT)."""
     payment = Payment.objects.filter(stripe_session_id=session_id).first()
 
-    # Configurar zona horaria de Bolivia
     bolivia_tz = pytz.timezone('America/La_Paz')
-
-    # Recuperar detalles desde Stripe si es necesario
     stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+
     stripe_session = None
     line_items = []
     payment_method_desc = 'Desconocido'
     customer_name = None
-    created_dt = timezone.now().astimezone(bolivia_tz)  # Convertir a hora Bolivia
+    created_dt = timezone.now().astimezone(bolivia_tz)
     amount_cents = None
-    amount_bob = None  # Monto en Bolivianos
     currency = 'usd'
-    
-    # Tasa de conversión USD a BOB (actualizar según corresponda)
     USD_TO_BOB_RATE = Decimal('6.86')
 
     try:
         stripe_session = stripe.checkout.Session.retrieve(session_id)
-        # intent to get line items
+
         try:
             li = stripe.checkout.Session.list_line_items(session_id)
             for item in li.data:
-                name = item.description or (getattr(item, 'description', None) or getattr(item, 'price', {}).get('product', 'Item'))
+                name = item.description or (getattr(item, 'description', None)
+                                            or getattr(item, 'price', {}).get('product', 'Item'))
                 qty = getattr(item, 'quantity', 1)
-                line_items.append({'name': name, 'quantity': qty, 'amount': getattr(item, 'amount_total', None)})
+                line_items.append({
+                    'name': name,
+                    'quantity': qty,
+                    'amount': getattr(item, 'amount_total', None)
+                })
         except Exception:
             line_items = []
 
-        # payment intent details
         pi = None
         try:
             pi_id = stripe_session.get('payment_intent')
@@ -184,26 +181,24 @@ def recibo_pdf(request, session_id: str):
         except Exception:
             pi = None
 
-        # customer details
         cust = stripe_session.get('customer_details') or {}
         customer_name = cust.get('name') or cust.get('email')
 
-        # created timestamp
+        # ✅ Convertir hora UTC a hora Bolivia
         ts = stripe_session.get('created')
         if ts:
-            created_dt = timezone.datetime.fromtimestamp(int(ts), tz=timezone.get_current_timezone())
+            created_dt = timezone.datetime.fromtimestamp(int(ts), tz=pytz.UTC).astimezone(bolivia_tz)
+        else:
+            created_dt = timezone.now().astimezone(bolivia_tz)
 
-        # amount & currency
         amt = stripe_session.get('amount_total') or stripe_session.get('amount_subtotal')
         if amt:
             amount_cents = int(amt)
         currency = stripe_session.get('currency') or currency
 
-        # payment method
         if pi and pi.get('charges') and pi['charges']['data']:
             ch = pi['charges']['data'][0]
             pm = ch.get('payment_method_details', {})
-            # card
             card = pm.get('card')
             if card:
                 payment_method_desc = f"Tarjeta {card.get('brand', '').title()} ****{card.get('last4', '')}"
@@ -212,29 +207,26 @@ def recibo_pdf(request, session_id: str):
         else:
             payment_method_desc = ','.join(str(x) for x in stripe_session.get('payment_method_types', [])) or 'Desconocido'
     except stripe.error.InvalidRequestError:
-        # no existe la sesión en Stripe
         stripe_session = None
     except Exception:
         stripe_session = None
 
-    # If still no payment and no stripe_session, 404
     if not payment and not stripe_session:
         return HttpResponse('Recibo no encontrado', status=404)
 
-    # Prefer DB values when available
     if payment:
         amount_cents = amount_cents or payment.amount_cents
         currency = payment.currency or currency
-        created_dt = payment.created_at or created_dt
+        if payment.created_at:
+            created_dt = payment.created_at.astimezone(bolivia_tz)
 
-    # Prepare receipt fields
     receipt_client = None
     if request.user and request.user.is_authenticated:
-        # Try common attributes for user name
-        receipt_client = getattr(request.user, 'nombre', None) or (request.user.get_full_name() if hasattr(request.user, 'get_full_name') else None) or getattr(request.user, 'username', None)
+        receipt_client = getattr(request.user, 'nombre', None) or \
+                         (request.user.get_full_name() if hasattr(request.user, 'get_full_name') else None) or \
+                         getattr(request.user, 'username', None)
     receipt_client = receipt_client or customer_name or 'Cliente'
 
-    # Intentar obtener items del carrito desde la metadata de la sesión
     receipt_items = []
     try:
         if stripe_session and stripe_session.get('metadata', {}).get('cart_items'):
@@ -253,7 +245,6 @@ def recibo_pdf(request, session_id: str):
                 name = it.get('name', 'Producto')
                 quantity = it.get('quantity', 1)
                 amount = it.get('amount', 0)
-                # Convertir de USD cents a BOB
                 price_bob = Decimal(str(amount)) / 100 * USD_TO_BOB_RATE
                 receipt_items.append({
                     'name': name,
@@ -261,38 +252,34 @@ def recibo_pdf(request, session_id: str):
                     'price_bob': price_bob
                 })
     except Exception:
-        # fallback: single item
         receipt_items.append({
             'name': 'Compra desde Adonai',
             'quantity': 1,
             'price_bob': Decimal('0')
         })
 
-    # Ensure ReportLab available
     if not REPORTLAB_AVAILABLE:
         return HttpResponse('La generación de PDF requiere la librería reportlab. Instálala con: pip install reportlab', status=500)
 
-    # Calcular monto total en BOB
     total_bob = Decimal('0')
     for item in receipt_items:
         total_bob += Decimal(str(item['price_bob'])) * Decimal(str(item['quantity']))
 
-    # Crear PDF
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    # Header
     p.setFont('Helvetica-Bold', 16)
     p.drawString(40, height - 60, 'Recibo de Pago - Adonai')
 
-    # Cliente y detalles de transacción
     p.setFont('Helvetica', 11)
     p.drawString(40, height - 100, f'Cliente: {receipt_client}')
     p.drawString(40, height - 120, f'Número de transacción: {session_id}')
-    p.drawString(40, height - 140, f'Fecha: {created_dt.strftime("%d/%m/%Y %H:%M:%S")} BOT')
 
-    # Detalle de productos
+    # ✅ Mostrar hora Bolivia
+    fecha_bolivia = created_dt.strftime("%d/%m/%Y %H:%M:%S")
+    p.drawString(40, height - 140, f'Fecha: {fecha_bolivia} (BOT)')
+
     p.drawString(40, height - 170, 'Detalle de productos/servicios:')
     y = height - 190
     for item in receipt_items:
@@ -304,22 +291,19 @@ def recibo_pdf(request, session_id: str):
         p.drawString(300, y, f'BOB {subtotal:.2f}')
         y -= 20
 
-    # Montos totales
     y -= 10
     p.setFont('Helvetica-Bold', 11)
-    p.drawString(40, y, f'Monto total pagado:')
+    p.drawString(40, y, 'Monto total pagado:')
     p.drawString(300, y, f'BOB {total_bob:.2f}')
     if amount_cents:
         y -= 20
         usd_amount = amount_cents / 100
         p.drawString(300, y, f'USD {usd_amount:.2f}')
-    
-    # Método de pago
+
     y -= 20
     p.setFont('Helvetica', 11)
     p.drawString(40, y, f'Medio de pago: {payment_method_desc}')
 
-    # Footer con agradecimiento y aviso legal
     p.line(40, 120, width - 40, 120)
     p.setFont('Helvetica', 10)
     y = 100
