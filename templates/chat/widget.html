@@ -84,20 +84,3 @@
 </style>
 
 <script src="{% static 'js/chat_widget.js' %}"></script>
-
-<!-- Marcador de diagnóstico -->
-<script>
-  (function(){
-    try{
-      var m = document.getElementById('chat-messages');
-      if(m && !window._adonai_chat_marker){
-        var el = document.createElement('div');
-        el.className = 'mb-2';
-        el.innerHTML = '<div class="text-start"><div class="d-inline-block p-2 bg-warning text-dark rounded">[WIDGET OK] El template del chat se ha incluido correctamente.</div></div>';
-        m.appendChild(el);
-        m.scrollTop = m.scrollHeight;
-        window._adonai_chat_marker = true;
-      }
-    }catch(e){ console.error('chat widget inline marker error', e); }
-  })();
-</script>

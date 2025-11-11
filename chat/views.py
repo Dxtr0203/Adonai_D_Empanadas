@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Crear cliente Gemini 2.5
 # Asegúrate de que settings.GEMINI_API_KEY esté configurado en settings.py
 
-client = genai.Client(api_key="AIzaSyAvIvQpRW6qL3ZqWtU8LY1o_RJjTeFrucs")
+client = genai.Client(api_key="AIzaSyAiRhg6_u2EiwZKU7DWbdu-7UZBnP_Lhx4")
 try:
     print("Inicializando cliente Gemini 2.5...")
     logger.info("Cliente Gemini 2.5 inicializado correctamente.")
