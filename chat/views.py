@@ -90,6 +90,7 @@ def get_gemini_response(prompt, history=[]):
             "El contexto del historial es importante para mantener la conversación."
         )
         
+    
         # 2. Construir la estructura de 'contents' para la API de Gemini
         contents = []
         
