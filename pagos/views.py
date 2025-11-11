@@ -8,6 +8,7 @@ import json
 import io
 import pytz
 from decimal import Decimal, ROUND_HALF_UP
+import logging
 
 from .models import Payment
 
@@ -18,6 +19,13 @@ try:
     REPORTLAB_AVAILABLE = True
 except Exception:
     REPORTLAB_AVAILABLE = False
+
+# Configurar el logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler('stripe_debug.log')
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 
 
 def checkout_view(request):
@@ -50,7 +58,6 @@ def create_checkout_session(request):
     if amount_bob is None:
         return JsonResponse({'error': 'amount_bob requerido'}, status=400)
 
-    # Usar el monto exacto en BOB sin ajustes
     amount_cents = int(amount_bob * 100)
 
     if amount_cents <= 0 or amount_cents > 100000000:
@@ -58,11 +65,13 @@ def create_checkout_session(request):
 
     try:
         success_url = domain + '/pago/exito/?session_id={CHECKOUT_SESSION_ID}'
+        cancel_url = domain + '/pago/error/'
+
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
-                    'currency': 'bob',  # Usar BOB directamente si Stripe lo permite
+                    'currency': 'bob',
                     'product_data': {'name': 'Compra desde Adonai'},
                     'unit_amount': amount_cents,
                 },
@@ -70,22 +79,21 @@ def create_checkout_session(request):
             }],
             mode='payment',
             success_url=success_url,
-            cancel_url=domain + '/pago/error/',
+            cancel_url=cancel_url,
         )
 
-        try:
-            Payment.objects.create(
-                stripe_session_id=session.id,
-                amount_cents=amount_cents,
-                currency='bob',  # Usar BOB directamente
-                status='created'
-            )
-        except Exception:
-            pass
+        Payment.objects.create(
+            stripe_session_id=session.id,
+            amount_cents=amount_cents,
+            currency='bob',
+            status='created'
+        )
 
         return JsonResponse({'id': session.id})
+    except stripe.error.StripeError as e:
+        return JsonResponse({'error': f'Stripe error: {str(e)}'}, status=500)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
 
 
 def pago_exito(request):
