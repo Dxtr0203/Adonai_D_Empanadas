@@ -1,0 +1,423 @@
+"""
+GUÍA DE DEPURACIÓN Y TROUBLESHOOTING
+Sistema M/M/1 - Adonai Store Chatbot
+"""
+
+# ============================================================================
+# PROBLEMA 1: El botón "Atención Personalizada" no aparece
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- No ves el botón en las opciones rápidas del chat
+
+CAUSAS POSIBLES:
+1. JavaScript no se cargó correctamente
+2. La función renderOptions no incluye el botón
+
+SOLUCIÓN:
+1. Abre la consola del navegador (F12)
+2. Verifica que no haya errores JavaScript
+3. En la pestaña Network, asegúrate que chat_widget.js se cargó
+4. Revisa que en chat_widget.js la línea onOpen() incluya:
+   renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+
+VERIFICACIÓN:
+- En el navegador, ejecuta en la consola:
+  document.querySelector('[data-user-id]')
+  // Debe retornar el elemento del botón
+
+- Verifica que el archivo se actualizó:
+  static/js/chat_widget.js debe incluir "Atención Personalizada"
+"""
+
+# ============================================================================
+# PROBLEMA 2: El endpoint retorna error 404
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Al hacer clic, ves: "Error 404 - Not Found"
+
+CAUSAS POSIBLES:
+1. La ruta no se agregó correctamente a urls.py
+2. El archivo views.py tiene errores de sintaxis
+
+SOLUCIÓN:
+1. Verifica que chat/urls.py tiene:
+   path('personalizado/', views.chat_personalizado, name='personalizado'),
+
+2. En terminal, ejecuta:
+   python manage.py check
+   # Debe mostrar: "System check identified no issues"
+
+3. Verifica la sintaxis de chat/views.py:
+   python -m py_compile chat/views.py
+   # No debe mostrar errores
+
+VERIFICACIÓN:
+- En Django shell:
+  from django.urls import reverse
+  reverse('chat:personalizado')
+  # Debe retornar: '/chat/personalizado/'
+"""
+
+# ============================================================================
+# PROBLEMA 3: Error 403 - Usuario no autenticado
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Mensaje: "Usuario no autenticado"
+
+CAUSAS POSIBLES:
+1. El usuario_id no se envía desde el frontend
+2. El usuario no está logueado
+
+SOLUCIÓN:
+1. Verifica en el navegador (F12 > Network) que la POST incluya usuario_id:
+   {
+     "message": "Atención Personalizada",
+     "usuario_id": 1
+   }
+
+2. Asegúrate de estar logueado en el sitio
+
+3. En chat_widget.js, verifica que:
+   const userId = toggle.getAttribute('data-user-id') || null;
+   // userId debe contener un número, no null
+
+VERIFICACIÓN:
+- En la consola del navegador:
+  fetch('/chat/personalizado/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify({usuario_id: 1, message: "test"})
+  }).then(r => r.json()).then(console.log)
+"""
+
+# ============================================================================
+# PROBLEMA 4: Error de CSRF token
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Error: "CSRF token missing or incorrect"
+
+CAUSAS POSIBLES:
+1. El token CSRF no se extrae correctamente
+2. El servidor CSRF no está configurado
+
+SOLUCIÓN:
+1. En chat_widget.js, verifica:
+   'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]
+   // Debe extraer el token correcto
+
+2. En settings.py, verifica:
+   MIDDLEWARE = [
+       ...
+       'django.middleware.csrf.CsrfViewMiddleware',
+       ...
+   ]
+
+3. En la plantilla base.html, asegúrate que existe:
+   {% csrf_token %}
+
+VERIFICACIÓN:
+- En la consola del navegador:
+  document.cookie.match(/csrftoken=([^;]+)/)[1]
+  // Debe retornar un token largo
+"""
+
+# ============================================================================
+# PROBLEMA 5: El chat no se crea en la base de datos
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- El endpoint retorna éxito, pero no hay chat en la BD
+
+CAUSAS POSIBLES:
+1. Error silencioso en la base de datos
+2. Modelo Chat no está correctamente configurado
+
+SOLUCIÓN:
+1. En Django shell, verifica el modelo:
+   from chat.models import Chat
+   Chat._meta.fields
+   # Debe mostrar todos los campos
+
+2. Verifica que los campos existen en la BD:
+   python manage.py dbshell
+   SHOW COLUMNS FROM chat_chat;
+
+3. Intenta crear un chat manualmente:
+   from chat.models import Chat
+   from usuarios.models import Usuario
+   user = Usuario.objects.first()
+   chat = Chat.objects.create(usuario=user, estado='esperando')
+   # Debe crear sin errores
+
+VERIFICACIÓN:
+- En Django shell:
+  Chat.objects.all()
+  # Debe mostrar los chats creados
+"""
+
+# ============================================================================
+# PROBLEMA 6: Las métricas no se calculan
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Métricas muestran 0 o "sin_datos"
+
+CAUSAS POSIBLES:
+1. No hay chats completados con duración
+2. El rango de tiempo es muy pequeño
+
+SOLUCIÓN:
+1. Crea un chat de prueba completo:
+   python manage.py shell
+   from chat.models import Chat
+   from usuarios.models import Usuario
+   from django.utils import timezone
+   from datetime import timedelta
+   
+   user = Usuario.objects.first()
+   chat = Chat.objects.create(
+       usuario=user,
+       estado='finalizado',
+       prioridad=2,
+       llegada=timezone.now() - timedelta(hours=1),
+       inicio_servicio=timezone.now() - timedelta(minutes=30),
+       fin_servicio=timezone.now() - timedelta(minutes=25),
+       duracion_segundos=300
+   )
+
+2. Verifica que hay datos:
+   Chat.objects.filter(estado='finalizado', duracion_segundos__isnull=False).count()
+
+VERIFICACIÓN:
+- python manage.py show_queue_stats
+  # Debe mostrar métricas calculadas (no "sin_datos")
+"""
+
+# ============================================================================
+# PROBLEMA 7: El servidor no procesa la cola correctamente
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Varios usuarios en 'en_atencion' simultáneamente
+- La lógica M/M/1 no funciona
+
+CAUSAS POSIBLES:
+1. procesar_cola() tiene errores
+2. Hay race conditions en concurrencia
+
+SOLUCIÓN:
+1. Verifica la función procesar_cola():
+   python manage.py shell
+   from chat.views import procesar_cola
+   siguiente = procesar_cola()
+   print(siguiente)
+   # Debe retornar None si hay alguien en atención
+
+2. Verifica manualmente:
+   from chat.models import Chat
+   Chat.objects.filter(estado='en_atencion').count()
+   # Debe ser máximo 1
+
+VERIFICACIÓN:
+- En Django shell:
+  chats = Chat.objects.all().values('id', 'estado', 'prioridad', 'llegada')
+  for chat in chats:
+      print(chat)
+  # Analiza que el estado es correcto
+"""
+
+# ============================================================================
+# PROBLEMA 8: Error de importación en views.py
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Error: "ImportError: cannot import name 'X' from 'chat.views'"
+
+CAUSAS POSIBLES:
+1. Las funciones no están definidas
+2. Hay errores de sintaxis
+
+SOLUCIÓN:
+1. Verifica la sintaxis:
+   python -m py_compile chat/views.py
+   # No debe mostrar errores
+
+2. Verifica que las funciones existen:
+   python manage.py shell
+   from chat import views
+   hasattr(views, 'chat_personalizado')
+   hasattr(views, 'procesar_cola')
+   hasattr(views, 'asignar_prioridad')
+   # Todos deben retornar True
+
+VERIFICACIÓN:
+- python manage.py check
+  # Debe pasar sin errores
+"""
+
+# ============================================================================
+# PROBLEMA 9: CSRF token en producción
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Funciona en desarrollo pero no en producción
+
+CAUSAS POSIBLES:
+1. HTTPS y cookies seguras
+2. Dominio cruzado (CORS)
+
+SOLUCIÓN:
+1. En settings.py para producción, verifica:
+   CSRF_COOKIE_SECURE = True  # Si usas HTTPS
+   CSRF_COOKIE_HTTPONLY = False  # Para que JS pueda leerlo
+   CSRF_TRUSTED_ORIGINS = ['https://tudominio.com']
+
+2. Asegúrate que la cookie se envía:
+   En la consola del navegador (F12):
+   document.cookie
+   # Debe incluir csrftoken
+
+VERIFICACIÓN:
+- Ejecuta en la consola:
+  document.cookie.match(/csrftoken=([^;]+)/)[1]
+  # Si retorna undefined, hay problema con la cookie
+"""
+
+# ============================================================================
+# PROBLEMA 10: Performance - Sistema lento
+# ============================================================================
+
+"""
+SÍNTOMAS:
+- Respuestas lentas desde /chat/personalizado/
+
+CAUSAS POSIBLES:
+1. Muchas consultas a BD (N+1)
+2. Métricas se calculan en cada request
+
+SOLUCIÓN:
+1. Optimiza las consultas en chat/views.py:
+   # En procesar_cola():
+   Chat.objects.filter(estado='en_atencion').exists()  # Usa exists() en lugar de count()
+
+2. Cache las métricas:
+   from django.core.cache import cache
+   metricas = cache.get('metricas_mm1')
+   if not metricas:
+       metricas = calcular_metricas()
+       cache.set('metricas_mm1', metricas, 300)  # Cache 5 min
+
+VERIFICACIÓN:
+- En Django shell:
+  import time
+  start = time.time()
+  from chat.views import procesar_cola
+  procesar_cola()
+  print(f"Tiempo: {time.time() - start}s")
+  # Debe ser < 0.1 segundos
+"""
+
+# ============================================================================
+# CHECKLIST DE DEPURACIÓN
+# ============================================================================
+
+"""
+Si algo no funciona, ejecuta este checklist:
+
+□ 1. Servidor Django está corriendo: http://127.0.0.1:8000
+□ 2. Estoy logueado en la aplicación
+□ 3. F12 > Console no muestra errores JavaScript
+□ 4. F12 > Network muestra POST a /chat/personalizado/ con status 200
+□ 5. python manage.py check retorna "System check identified no issues"
+□ 6. python -m py_compile chat/views.py no muestra errores
+□ 7. El archivo chat/urls.py tiene path('personalizado/', ...)
+□ 8. El archivo chat_widget.js incluye "Atención Personalizada"
+□ 9. El archivo chat_widget.js tiene sendPersonalizado() function
+□ 10. Django shell: from chat.views import chat_personalizado funciona
+
+Si todo está OK pero aún no funciona:
+- Reinicia el servidor Django
+- Limpia la caché del navegador (Ctrl+Shift+Del)
+- Actualiza la página (Ctrl+F5)
+"""
+
+# ============================================================================
+# LOGS ÚTILES
+# ============================================================================
+
+"""
+Habilitar logs de Django para ver qué pasa:
+
+En settings.py, agregar:
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}
+
+Luego en la terminal, verás mensajes como:
+[13/Nov/2024 10:30:45] "POST /chat/personalizado/ HTTP/1.1" 200
+"""
+
+# ============================================================================
+# COMANDOS ÚTILES
+# ============================================================================
+
+"""
+# Ver el estado actual de la cola
+python manage.py show_queue_stats
+
+# Ver solo la cola (sin métricas)
+python manage.py show_queue_stats --cola
+
+# Ver métricas de últimas 48 horas
+python manage.py show_queue_stats --horas 48
+
+# Ejecutar script de prueba rápida
+python manage.py shell < chat/quick_test.py
+
+# Ver logs de base de datos
+python manage.py sqlmigrate chat 0001
+
+# Resetear la cola (CUIDADO - elimina datos)
+python manage.py shell
+from chat.models import Chat
+Chat.objects.all().delete()
+"""
+
+# ============================================================================
+# CONTACTO
+# ============================================================================
+
+"""
+Si necesitas más ayuda:
+1. Revisa TESTING_GUIDE.txt
+2. Revisa ADVANCED_GUIDE.txt
+3. Revisa MM1_README.md
+4. Ejecuta quick_test.py para validar
+5. Verifica los logs de Django
+"""

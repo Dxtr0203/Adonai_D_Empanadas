@@ -1,0 +1,508 @@
+"""
+GUÍA DE IMPLEMENTACIÓN AVANZADA - Sistema M/M/1 para Adonai Chatbot
+
+Este archivo proporciona ejemplos de cómo extender y personalizar
+el sistema de colas M/M/1 según tus necesidades.
+"""
+
+# ============================================================================
+# 1. AGREGAR GEMINI AI DURANTE LA ATENCIÓN PERSONALIZADA
+# ============================================================================
+
+"""
+En chat/views.py, modificar la función chat_personalizado() para usar Gemini:
+
+@csrf_exempt
+def chat_personalizado(request):
+    # ... código anterior ...
+    
+    # Agregar esta sección después de procesar_cola():
+    if chat.estado == 'en_atencion':
+        # Usar Gemini para responder en la atención personalizada
+        respuesta_gemini = get_gemini_response(
+            mensaje,
+            history=obtener_historial_chat(chat)
+        )
+        reply = f"🎧 Tu turno ha llegado!\n\n{respuesta_gemini}"
+    else:
+        # ... código de cola ...
+    
+    return JsonResponse({...})
+
+def obtener_historial_chat(chat):
+    # Obtener últimos 5 mensajes para contexto
+    mensajes = MensajeChat.objects.filter(chat=chat).order_by('-fecha_envio')[:5]
+    return [{'role': m.remitente, 'text': m.contenido} for m in reversed(mensajes)]
+"""
+
+# ============================================================================
+# 2. FINALIZAR AUTOMÁTICAMENTE UN CHAT DESPUÉS DE UN TIEMPO
+# ============================================================================
+
+"""
+Crear un archivo chat/tasks.py para usar con Celery (si está disponible):
+
+from celery import shared_task
+from django.utils import timezone
+from datetime import timedelta
+from .models import Chat
+
+@shared_task
+def finalizar_chats_inactivos(minutos=30):
+    '''Finaliza chats que llevan más de N minutos sin actividad'''
+    tiempo_limite = timezone.now() - timedelta(minutes=minutos)
+    
+    chats_inactivos = Chat.objects.filter(
+        estado='en_atencion',
+        inicio_servicio__lt=tiempo_limite
+    )
+    
+    for chat in chats_inactivos:
+        chat.estado = 'finalizado'
+        chat.fin_servicio = timezone.now()
+        chat.duracion_segundos = int(
+            (chat.fin_servicio - chat.inicio_servicio).total_seconds()
+        )
+        chat.save()
+    
+    return f'{chats_inactivos.count()} chats finalizados por inactividad'
+
+# En settings.py, agregar:
+CELERY_BEAT_SCHEDULE = {
+    'finalizar-inactivos': {
+        'task': 'chat.tasks.finalizar_chats_inactivos',
+        'schedule': crontab(minute='*/15'),  # Cada 15 minutos
+    },
+}
+"""
+
+# ============================================================================
+# 3. ENDPOINT PARA FINALIZAR CHAT MANUALMENTE
+# ============================================================================
+
+"""
+Agregar en chat/views.py:
+
+@csrf_exempt
+def finalizar_chat(request):
+    '''Endpoint para que un empleado o usuario finalice un chat'''
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    
+    chat_id = payload.get('chat_id')
+    if not chat_id:
+        return JsonResponse({'ok': False, 'error': 'chat_id requerido'}, status=400)
+    
+    try:
+        chat = Chat.objects.get(pk=chat_id)
+    except Chat.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Chat no encontrado'}, status=404)
+    
+    if chat.estado not in ['esperando', 'en_atencion']:
+        return JsonResponse({'ok': False, 'error': 'El chat ya fue finalizado'}, status=400)
+    
+    # Marcar como finalizado
+    chat.estado = 'finalizado'
+    chat.fin_servicio = timezone.now()
+    if chat.inicio_servicio:
+        chat.duracion_segundos = int(
+            (chat.fin_servicio - chat.inicio_servicio).total_seconds()
+        )
+    chat.save()
+    
+    # Procesar siguiente en la cola
+    siguiente = procesar_cola()
+    
+    return JsonResponse({
+        'ok': True,
+        'mensaje': 'Chat finalizado correctamente',
+        'siguiente_chat_id': siguiente.id if siguiente else None
+    })
+
+# En chat/urls.py, agregar:
+path('finalizar/', views.finalizar_chat, name='finalizar'),
+"""
+
+# ============================================================================
+# 4. CREAR ENDPOINT PARA VER LA POSICIÓN ACTUAL EN LA COLA
+# ============================================================================
+
+"""
+Agregar en chat/views.py:
+
+@csrf_exempt
+def ver_posicion_cola(request):
+    '''Obtiene la posición actual del usuario en la cola'''
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    
+    usuario_id = payload.get('usuario_id')
+    if not usuario_id:
+        return JsonResponse({'ok': False, 'error': 'Usuario no autenticado'}, status=403)
+    
+    try:
+        user = Usuario.objects.get(pk=usuario_id)
+    except Usuario.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Usuario no encontrado'}, status=404)
+    
+    # Buscar chat activo del usuario
+    chat = Chat.objects.filter(
+        usuario=user,
+        estado__in=['esperando', 'en_atencion']
+    ).first()
+    
+    if not chat:
+        return JsonResponse({
+            'ok': True,
+            'hay_chat_activo': False,
+            'mensaje': 'No tienes un chat activo en la cola'
+        })
+    
+    # Calcular posición
+    if chat.estado == 'en_atencion':
+        posicion = 0
+        mensaje = '🎧 Estás siendo atendido ahora'
+    else:
+        posicion = Chat.objects.filter(
+            estado='esperando',
+            llegada__lt=chat.llegada
+        ).count() + 1
+        mensaje = f'📋 Tu posición en la cola: {posicion}'
+    
+    return JsonResponse({
+        'ok': True,
+        'hay_chat_activo': True,
+        'posicion': posicion,
+        'estado': chat.estado,
+        'mensaje': mensaje,
+        'tiempo_espera_estimado_minutos': round((posicion - 1) * 5, 1)  # Estimación
+    })
+
+# En chat/urls.py, agregar:
+path('ver-posicion/', views.ver_posicion_cola, name='ver_posicion'),
+
+# En chat_widget.js, agregar función:
+async function verPosicion() {
+  try {
+    const res = await fetch('/chat/ver-posicion/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]
+      },
+      body: JSON.stringify({ usuario_id: userId })
+    });
+    const payload = await res.json();
+    if (payload.ok && payload.hay_chat_activo) {
+      appendMessage('bot', payload.mensaje);
+    }
+  } catch (err) {
+    console.error('Error al ver posición', err);
+  }
+}
+"""
+
+# ============================================================================
+# 5. CREAR UN PANEL ADMINISTRATIVO PARA VER LA COLA
+# ============================================================================
+
+"""
+Crear archivo chat/admin_views.py:
+
+from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import render
+from .models import Chat
+
+@user_passes_test(lambda u: u.is_staff)
+def cola_admin(request):
+    '''Vista de administración para ver la cola de chats'''
+    chats_esperando = Chat.objects.filter(estado='esperando').order_by('-prioridad', 'llegada')
+    chats_en_atencion = Chat.objects.filter(estado='en_atencion')
+    
+    context = {
+        'chats_esperando': chats_esperando,
+        'chats_en_atencion': chats_en_atencion,
+    }
+    return render(request, 'chat/admin_cola.html', context)
+
+# En chat/urls.py, agregar:
+path('admin/cola/', views.cola_admin, name='cola_admin'),
+
+# Crear template chat/templates/chat/admin_cola.html:
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>📊 Panel de Control - Cola M/M/1</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning">
+                    En atención ({{ chats_en_atencion.count }})
+                </div>
+                <div class="card-body">
+                    {% for chat in chats_en_atencion %}
+                    <p><strong>{{ chat.usuario.nombre }}</strong> - Prioridad: {{ chat.prioridad }}</p>
+                    <small>Desde: {{ chat.inicio_servicio|date:'d/m/Y H:i' }}</small>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    En espera ({{ chats_esperando.count }})
+                </div>
+                <div class="card-body">
+                    {% for chat in chats_esperando %}
+                    <p><strong>{{ chat.usuario.nombre }}</strong> - Prioridad: {{ chat.prioridad }}</p>
+                    <small>Llegó: {{ chat.llegada|date:'d/m/Y H:i' }}</small>
+                    <hr>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+"""
+
+# ============================================================================
+# 6. USAR DJANGO SIGNALS PARA ACCIONES AUTOMÁTICAS
+# ============================================================================
+
+"""
+Crear archivo chat/signals.py:
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from .models import Chat
+from .views import procesar_cola
+
+@receiver(post_save, sender=Chat)
+def al_guardar_chat(sender, instance, created, **kwargs):
+    '''Ejecutar lógica cuando se guarda un Chat'''
+    if instance.estado == 'finalizado' and instance.duracion_segundos is None:
+        # Calcular duración si no se ha hecho
+        if instance.inicio_servicio and instance.fin_servicio:
+            from django.utils import timezone
+            instance.duracion_segundos = int(
+                (instance.fin_servicio - instance.inicio_servicio).total_seconds()
+            )
+            instance.save(update_fields=['duracion_segundos'])
+    
+    # Si se finalizó un chat, procesar el siguiente
+    if instance.estado == 'finalizado':
+        procesar_cola()
+
+# En chat/apps.py, agregar:
+from django.apps import AppConfig
+
+class ChatConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'chat'
+    
+    def ready(self):
+        import chat.signals
+"""
+
+# ============================================================================
+# 7. WEBHOOK PARA NOTIFICACIONES EN TIEMPO REAL (WebSocket)
+# ============================================================================
+
+"""
+Si deseas notificaciones en tiempo real, instala Django Channels:
+
+pip install channels
+
+Crear archivo chat/consumers.py:
+
+from channels.generic.websocket import AsyncWebsocketConsumer
+import json
+
+class ColaConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.cola_group = 'cola_actualizar'
+        await self.channel_layer.group_add(self.cola_group, self.channel_name)
+        await self.accept()
+    
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.cola_group, self.channel_name)
+    
+    async def cola_actualizar(self, event):
+        # Enviar actualización de cola a WebSocket
+        await self.send(text_data=json.dumps({
+            'tipo': 'actualizar_cola',
+            'posicion': event['posicion'],
+            'estado': event['estado']
+        }))
+
+# En settings.py:
+INSTALLED_APPS = [
+    ...
+    'daphne',  # Antes que 'django.contrib.contenttypes'
+    'channels',
+    ...
+]
+
+ASGI_APPLICATION = 'adonai.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
+
+# En adonai/asgi.py:
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from django.core.asgi import get_asgi_application
+from chat.routing import websocket_urlpatterns
+
+application = ProtocolTypeRouter({
+    'http': get_asgi_application(),
+    'websocket': AuthMiddlewareStack(URLRouter(websocket_urlpatterns)),
+})
+
+# Crear chat/routing.py:
+from django.urls import re_path
+from . import consumers
+
+websocket_urlpatterns = [
+    re_path(r'ws/cola/$', consumers.ColaConsumer.as_asgi()),
+]
+"""
+
+# ============================================================================
+# 8. EJEMPLO: PRIORIDAD DINÁMICA BASADA EN TIPO DE CLIENTE
+# ============================================================================
+
+"""
+En chat/views.py, mejorar asignar_prioridad():
+
+def asignar_prioridad(texto, usuario=None):
+    '''Asigna prioridad basada en texto y perfil del usuario'''
+    texto = texto.lower()
+    prioridad = 1
+    
+    # Prioridad por contenido del mensaje
+    if "urgente" in texto or "reclamo" in texto or "problema" in texto:
+        prioridad = 3
+    elif "pedido" in texto or "compra" in texto or "orden" in texto:
+        prioridad = 2
+    
+    # Prioridad por perfil del usuario (si es cliente VIP)
+    if usuario and hasattr(usuario, 'es_cliente_vip') and usuario.es_cliente_vip:
+        prioridad += 1  # Aumentar 1 nivel
+    
+    return min(prioridad, 3)  # Máximo 3
+"""
+
+# ============================================================================
+# 9. REPORTES Y ANALÍTICAS
+# ============================================================================
+
+"""
+Crear archivo chat/reports.py:
+
+from django.db.models import Avg, Count, Q
+from django.utils import timezone
+from datetime import timedelta
+from .models import Chat
+
+def generar_reporte_diario():
+    '''Genera un reporte de desempeño diario del sistema'''
+    hoy = timezone.now().date()
+    chats_hoy = Chat.objects.filter(llegada__date=hoy)
+    
+    completados = chats_hoy.filter(estado='finalizado')
+    tiempo_promedio = completados.aggregate(Avg('duracion_segundos'))['duracion_segundos__avg'] or 0
+    
+    reporte = {
+        'fecha': hoy,
+        'total_chats': chats_hoy.count(),
+        'completados': completados.count(),
+        'en_cola': chats_hoy.filter(estado='esperando').count(),
+        'tiempo_promedio_servicio': round(tiempo_promedio / 60, 2),  # en minutos
+        'tasa_completacion': round(
+            (completados.count() / chats_hoy.count() * 100) if chats_hoy.exists() else 0,
+            2
+        )
+    }
+    
+    return reporte
+
+def generar_reporte_semanal():
+    '''Genera un reporte semanal'''
+    hace_7_dias = timezone.now() - timedelta(days=7)
+    chats_semana = Chat.objects.filter(llegada__gte=hace_7_dias)
+    
+    completados = chats_semana.filter(estado='finalizado')
+    
+    reporte = {
+        'periodo': f'Últimos 7 días',
+        'total_chats': chats_semana.count(),
+        'completados': completados.count(),
+        'tiempo_promedio_servicio': round(
+            (completados.aggregate(Avg('duracion_segundos'))['duracion_segundos__avg'] or 0) / 60,
+            2
+        ),
+    }
+    
+    return reporte
+"""
+
+# ============================================================================
+# 10. COMANDO PARA LIMPIAR CHATS ANTIGUOS
+# ============================================================================
+
+"""
+Crear archivo chat/management/commands/limpiar_chats_antiguos.py:
+
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+from datetime import timedelta
+from chat.models import Chat
+
+class Command(BaseCommand):
+    help = 'Elimina chats completados hace más de N días'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--dias',
+            type=int,
+            default=30,
+            help='Número de días (default: 30)'
+        )
+
+    def handle(self, *args, **options):
+        dias = options.get('dias')
+        fecha_limite = timezone.now() - timedelta(days=dias)
+        
+        chats_eliminar = Chat.objects.filter(
+            estado='finalizado',
+            fin_servicio__lt=fecha_limite
+        )
+        
+        cantidad = chats_eliminar.count()
+        chats_eliminar.delete()
+        
+        self.stdout.write(
+            self.style.SUCCESS(f'Se eliminaron {cantidad} chats completados')
+        )
+
+# Ejecutar:
+# python manage.py limpiar_chats_antiguos --dias 60
+"""

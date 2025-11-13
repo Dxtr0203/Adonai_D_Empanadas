@@ -68,7 +68,7 @@
     const greeted = sessionStorage.getItem('adonai_chat_greeted');
     if(!greeted){
       appendMessage('bot', '¡Hola! 👋 Soy el asistente de Adonai. Puedes escoger una opción rápida o escribir tu pregunta.');
-      renderOptions(['Productos','Categorías','Delivery','Información','Promociones']);
+      renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
       sessionStorage.setItem('adonai_chat_greeted', '1');
     }
 
@@ -118,6 +118,13 @@
   async function sendOption(optionText){
     appendMessage('me', optionText);
     renderOptions([]);
+    
+    // Detectar si es "Atención Personalizada" y manejar especialmente
+    if (optionText === 'Atención Personalizada') {
+      await sendPersonalizado(optionText);
+      return;
+    }
+    
     try{
       const body = { option: optionText };
       if(userId) body.usuario_id = userId;
@@ -155,5 +162,58 @@
   // ==========================
   sendBtn.addEventListener('click', sendMessage);
   input.addEventListener('keydown', function(e){ if(e.key === 'Enter') sendMessage(); });
+
+  // ==========================
+  // Función para Atención Personalizada (M/M/1)
+  // ==========================
+  async function sendPersonalizado(text) {
+    if (!userId) {
+      appendMessage('bot', '❌ Debes estar autenticado para solicitar atención personalizada.');
+      renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+      return;
+    }
+
+    try {
+      const body = { 
+        message: text, 
+        usuario_id: userId 
+      };
+      const res = await fetch('/chat/personalizado/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]
+        },
+        body: JSON.stringify(body)
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        appendMessage('bot', `❌ Error: ${errorData.error || 'Error desconocido'}`);
+        renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+        return;
+      }
+      
+      const payload = await res.json();
+      if (payload.ok) {
+        appendMessage('bot', payload.reply);
+        
+        // Si el usuario está siendo atendido ahora, mostrar opciones de continuación
+        if (payload.estado === 'en_atencion') {
+          renderOptions(['Continuar conversación', 'Volver al menú']);
+        } else {
+          // Si está en la cola, mostrar opción de esperar o volver
+          renderOptions(['Ver mi posición', 'Volver al menú']);
+        }
+      } else {
+        appendMessage('bot', `❌ Error: ${payload.error || 'Error desconocido'}`);
+        renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+      }
+    } catch (err) {
+      console.error('Chat personalizado error', err);
+      appendMessage('bot', '❌ Error de conexión al solicitar atención personalizada');
+      renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+    }
+  }
 
 })();
