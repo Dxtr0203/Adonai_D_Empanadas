@@ -114,6 +114,10 @@
           <i class="bi bi-cart"></i> Carrito (<span id="cart-count">0</span>)
         </button>
 
+        <a href="https://dashboard.stripe.com/acct_1SQIYyA0jLs58UPd/test/payments" class="btn btn-outline-info btn-sm" target="_blank">
+          <i class="bi bi-clock-history"></i> Historial de Compras
+        </a>
+
         {% if request.user.is_authenticated %}
           <div class="dropdown">
             <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
@@ -139,6 +143,9 @@
         {% else %}
           <a href="{% url 'usuarios:register' %}" class="btn btn-outline-success btn-sm">
             <i class="bi bi-person-plus"></i> Registrarse
+          </a>
+          <a href="{% url 'usuarios:login' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-box-arrow-in-right"></i> Iniciar sesión
           </a>
         {% endif %}
       </div>
