@@ -15,22 +15,40 @@ from productos.models import Producto, Categoria  # Asume que estos modelos est�
 from ventas.models import VentaDetalle  # Asume que este modelo está definido
 
 # Gemini 2.5 imports
-from google import genai
-from google.genai.errors import APIError
+try:
+    from google import genai
+    from google.genai.errors import APIError
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    # Si no está disponible, crear stubs
+    class APIError(Exception):
+        pass
+    class genai:
+        class Client:
+            def __init__(self, api_key=None):
+                pass
+        @staticmethod
+        def Client(**kwargs):
+            return None
 
 logger = logging.getLogger(__name__)
 
 # Crear cliente Gemini 2.5
 # Asegúrate de que settings.GEMINI_API_KEY esté configurado en settings.py
 
-client = genai.Client(api_key="AIzaSyAiRhg6_u2EiwZKU7DWbdu-7UZBnP_Lhx4")
-try:
-    print("Inicializando cliente Gemini 2.5...")
-    logger.info("Cliente Gemini 2.5 inicializado correctamente.")
-except Exception:
-    # Manejo básico si la clave no está disponible al inicio
-    logger.error("La clave GEMINI_API_KEY no está configurada correctamente.")
-    client = None
+client = None
+if GEMINI_AVAILABLE:
+    try:
+        client = genai.Client(api_key="AIzaSyAiRhg6_u2EiwZKU7DWbdu-7UZBnP_Lhx4")
+        print("Inicializando cliente Gemini 2.5...")
+        logger.info("Cliente Gemini 2.5 inicializado correctamente.")
+    except Exception as e:
+        # Manejo básico si la clave no está disponible al inicio
+        logger.error(f"Error al inicializar Gemini: {e}")
+        client = None
+else:
+    logger.warning("Google Generative AI no está instalado. El chat funcionará en modo limitado.")
 
 # ===========================
 # FUNCIONES AUXILIARES
@@ -83,12 +101,29 @@ def get_gemini_response(prompt, history=[]):
     try:
         # 1. Instrucción de sistema para el modelo
         system_instruction = (
-            "Eres Adonai, un asistente de chat amigable y profesional para una tienda de "
-            "Mascotas. Tu rol principal es ayudar con pedidos, productos, promociones, "
-            "delivery e información de contacto. Mantén tus respuestas concisas y claras. "
-            "Cuando se te pregunte por un tema que tienes cubierto en la lógica interna (ej. 'delivery', 'horario'), "
-            "responde de forma genérica o amigable, y recuerda al usuario que la información detallada está en la web si no puedes proveerla directamente."
-            "El contexto del historial es importante para mantener la conversación."
+            "Eres Adonai, un asistente de chat amigable y profesional para una tienda de Mascotas. "
+            "Tu rol principal es ayudar con pedidos, productos, promociones, delivery e información de contacto. "
+            "\n\n"
+            "CONTEXTO IMPORTANTE - TEORÍA DE COLAS M/M/1:\n"
+            "- Estás gestionando una cola de atención personalizada con un único servidor (M/M/1)\n"
+            "- Los clientes se atienden por orden de PRIORIDAD y hora de llegada (FIFO)\n"
+            "- Prioridad 3 (URGENTE): Reclamos, problemas, solicitudes urgentes\n"
+            "- Prioridad 2 (IMPORTANTE): Pedidos, compras, órdenes\n"
+            "- Prioridad 1 (NORMAL): Consultas generales\n"
+            "- El sistema registra automáticamente:\n"
+            "  * Hora de llegada del cliente (λ - tasa de llegada)\n"
+            "  * Tiempo de atención (μ - tasa de servicio)\n"
+            "  * Posición en cola (Lq - clientes esperando)\n"
+            "  * Tiempo de espera promedio (Wq)\n"
+            "  * Tiempo total en sistema (Ws)\n"
+            "\n"
+            "INSTRUCCIONES DE RESPUESTA:\n"
+            "- Mantén respuestas concisas y claras\n"
+            "- Si el cliente tiene un RECLAMO o PROBLEMA, muestra empatía e intenta resolver rápidamente\n"
+            "- Para consultas de PEDIDOS, proporciona información relevante\n"
+            "- Para otros temas, sé amable y útil\n"
+            "- El historial de conversación es importante - mantén la conversación contextualizada\n"
+            "- Este es un chat de ATENCIÓN PERSONALIZADA, así que trata al cliente como si fuera tu prioridad\n"
         )
         
     
@@ -133,7 +168,8 @@ def chat_send(request):
 
     try:
         payload = json.loads(request.body.decode('utf-8'))
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error al parsear JSON: {e}")
         return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
 
     message = (payload.get('message') or '').strip()
@@ -149,9 +185,27 @@ def chat_send(request):
         try:
             # Usar .select_related() para evitar consultas N+1 si el modelo Chat accede a Usuario
             user = Usuario.objects.get(pk=usuario_id)
-            # 'en_atencion' es el estado que indica que el chat está activo.
-            chat, _ = Chat.objects.get_or_create(usuario=user, estado='en_atencion')
+            
+            # Primero, buscar un chat activo (esperando o en_atencion)
+            chat = Chat.objects.filter(
+                usuario=user,
+                estado__in=['esperando', 'en_atencion']
+            ).first()
+            
+            # Si no hay chat activo, crear uno nuevo
+            if not chat:
+                chat = Chat.objects.create(
+                    usuario=user,
+                    estado='en_atencion',
+                    prioridad=1,
+                    llegada=timezone.now()
+                )
+            logger.debug(f"Chat obtenido/creado: {chat.id}, Estado: {chat.estado}")
         except Usuario.DoesNotExist:
+            logger.error(f"Usuario {usuario_id} no encontrado")
+            chat = None
+        except Exception as e:
+            logger.error(f"Error al obtener/crear chat: {e}")
             chat = None
 
     user_text = option if option else message
@@ -258,7 +312,7 @@ def chat_send(request):
         history_for_gemini = []
         if chat:
             # Se obtienen los últimos 9 mensajes, ordenados de más antiguo a más reciente
-            recent_messages_qs = MensajeChat.objects.filter(chat=chat).order_by('-creado_en')[:9]
+            recent_messages_qs = MensajeChat.objects.filter(chat=chat).order_by('-fecha_envio')[:9]
             # Invertir la lista para orden cronológico (de antiguo a nuevo)
             recent_messages = list(reversed(recent_messages_qs))
             
@@ -281,24 +335,42 @@ def chat_send(request):
         try:
             # Solo se crea si no fue creado antes por un camino de lógica interna
             if is_internal_reply:
-                 MensajeChat.objects.get_or_create(chat=chat, remitente='Usuario', contenido=user_text)
+                 MensajeChat.objects.get_or_create(
+                     chat=chat, 
+                     remitente='Usuario', 
+                     contenido=user_text,
+                     defaults={'chat': chat, 'remitente': 'Usuario'}
+                 )
             else:
                  # Si vino por Gemini, el mensaje del usuario no se ha guardado
-                 MensajeChat.objects.create(chat=chat, remitente='Usuario', contenido=user_text)
+                 MensajeChat.objects.create(
+                     chat=chat, 
+                     remitente='Usuario', 
+                     contenido=user_text
+                 )
+            logger.debug(f"Mensaje del usuario guardado: {user_text}")
         except Exception as e:
             logger.error(f"Error al guardar mensaje del usuario: {e}")
-            pass
 
     # 2. Guardar respuesta del bot (solo si el chat existe y hay una respuesta)
     if chat and reply:
         try:
-            MensajeChat.objects.create(chat=chat, remitente='Bot', contenido=reply)
+            MensajeChat.objects.create(
+                chat=chat, 
+                remitente='Bot', 
+                contenido=reply
+            )
+            logger.debug(f"Respuesta del bot guardada")
         except Exception as e:
             logger.error(f"Error al guardar mensaje del bot: {e}")
-            pass
 
     logger.debug(f"Usuario ID: {usuario_id}, Mensaje: {message}, Opción: {option}")
     logger.debug(f"Respuesta del bot: {reply}, Opciones sugeridas: {suggested}")
+
+    # Si no hay respuesta, devolver un mensaje de error
+    if not reply:
+        logger.error(f"No se generó respuesta para el usuario {usuario_id}")
+        reply = "Disculpa, hubo un problema al procesar tu mensaje. Por favor, intenta de nuevo."
 
     return JsonResponse({'ok': True, 'reply': reply, 'suggested': suggested})
 
@@ -369,11 +441,15 @@ def chat_personalizado(request):
     usuario_id = payload.get('usuario_id')
     mensaje = (payload.get('message') or '').strip()
 
-    if not usuario_id:
-        return JsonResponse({'ok': False, 'error': 'Usuario no autenticado'}, status=403)
-
     if not mensaje:
         return JsonResponse({'ok': False, 'error': 'Mensaje vacío'}, status=400)
+
+    # Si no hay usuario_id, intentar obtener del usuario autenticado en la sesión
+    if not usuario_id and request.user.is_authenticated:
+        usuario_id = request.user.id
+
+    if not usuario_id:
+        return JsonResponse({'ok': False, 'error': 'Usuario no autenticado. Por favor, inicia sesión.'}, status=403)
 
     try:
         user = Usuario.objects.get(pk=usuario_id)
@@ -410,6 +486,9 @@ def chat_personalizado(request):
 
     # Procesar la cola M/M/1
     siguiente = procesar_cola()
+    
+    # Refrescar el estado del chat desde la BD por si procesar_cola lo cambió
+    chat.refresh_from_db()
 
     # Determinar respuesta según el estado
     if chat.estado == 'en_atencion':

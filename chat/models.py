@@ -16,6 +16,10 @@ class Chat(models.Model):
     fin_servicio = models.DateTimeField(blank=True, null=True)
     duracion_segundos = models.IntegerField(blank=True, null=True)
 
+    class Meta:
+        db_table = 'chats'
+        managed = False
+
 class MensajeChat(models.Model):
     REMITENTE_CHOICES = (
         ('Usuario','Usuario'),
@@ -26,3 +30,7 @@ class MensajeChat(models.Model):
     remitente = models.CharField(max_length=20, choices=REMITENTE_CHOICES)
     contenido = models.TextField()
     fecha_envio = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'mensajes_chat'
+        managed = False
