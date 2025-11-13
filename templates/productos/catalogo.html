@@ -99,4 +99,22 @@
 
 <!-- Cart modal and cart JS moved to base.html -->
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var select = document.getElementById('filter-categoria');
+  if (select) {
+    select.addEventListener('change', function() {
+      // Enviar el formulario que contiene el select
+      if (this.form) {
+        this.form.submit();
+      } else {
+        // fallback: buscar el primer formulario en la página
+        var f = document.querySelector('form');
+        if (f) f.submit();
+      }
+    });
+  }
+});
+</script>
+
 {% endblock %}
