@@ -9,7 +9,8 @@
 
   if(!toggle || !panel) return;
 
-  const userId = toggle.getAttribute('data-user-id') || null;
+  const userIdAttr = toggle.getAttribute('data-user-id');
+  const userId = userIdAttr ? parseInt(userIdAttr, 10) : null;
   const isAuthenticated = toggle.getAttribute('data-authenticated') === '1';
   // Toggle to allow anonymous users to request "Atención Personalizada".
   // Set to `false` to re-enable authentication check later.
@@ -91,22 +92,40 @@
     try{
       const body = { message: text };
       if(userId) body.usuario_id = userId;
+      console.log('Enviando mensaje:', body);
       const res = await fetch('/chat/send/', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json', 
-          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] 
+          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] || ''
         },
         body: JSON.stringify(body)
       });
-      if(!res.ok){ appendMessage('bot', 'Error al enviar mensaje.'); return; }
-      const payload = await res.json();
+      
+      console.log('Response status:', res.status, res.statusText);
+      
+      let payload;
+      try {
+        payload = await res.json();
+      } catch (jsonErr) {
+        console.error('Error parsing JSON response:', jsonErr);
+        appendMessage('bot', '❌ Error: Respuesta inválida del servidor');
+        return;
+      }
+      
+      if(!res.ok){ 
+        appendMessage('bot', `❌ Error (${res.status}): ${payload.error || 'Error desconocido'}`); 
+        return; 
+      }
+      
       if(payload.ok){ 
         appendMessage('bot', payload.reply); 
-      } else appendMessage('bot', payload.error || 'Error desconocido');
+      } else {
+        appendMessage('bot', `❌ ${payload.error || 'Error desconocido'}`);
+      }
     } catch(err){ 
       console.error('Chat send error', err); 
-      appendMessage('bot', 'Error de conexión'); 
+      appendMessage('bot', `❌ Error de conexión: ${err.message}`); 
     }
   }
 
@@ -160,38 +179,57 @@
   // Función para Atención Personalizada (M/M/1)
   // ==========================
   async function sendPersonalizado(text) {
-    if (!ALLOW_ANONYMOUS_PERSONALIZADA && !userId) {
-      appendMessage('bot', '❌ Debes estar autenticado para solicitar atención personalizada.');
+    // Verificar autenticación SOLO si no está permitido acceso anónimo
+    if (!ALLOW_ANONYMOUS_PERSONALIZADA && (!userId || !isAuthenticated)) {
+      appendMessage('bot', '❌ Debes estar autenticado para solicitar atención personalizada. Por favor, inicia sesión.');
       return;
     }
 
     try {
-      const body = { message: text };
-      if (userId) body.usuario_id = userId;
+      const body = { 
+        message: text
+      };
+      
+      // Agregar usuario_id si está disponible
+      if (userId) {
+        body.usuario_id = userId;
+      }
+      
+      console.log('Enviando atención personalizada:', body);
+      
       const res = await fetch('/chat/personalizado/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]
+          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] || ''
         },
         body: JSON.stringify(body)
       });
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        appendMessage('bot', `❌ Error: ${errorData.error || 'Error desconocido'}`);
+      console.log('Response status:', res.status, res.statusText);
+      
+      let payload;
+      try {
+        payload = await res.json();
+      } catch (jsonErr) {
+        console.error('Error parsing JSON response:', jsonErr);
+        appendMessage('bot', '❌ Error: Respuesta inválida del servidor');
         return;
       }
       
-      const payload = await res.json();
+      if (!res.ok) {
+        appendMessage('bot', `❌ Error (${res.status}): ${payload.error || 'Error desconocido'}`);
+        return;
+      }
+      
       if (payload.ok) {
         appendMessage('bot', payload.reply);
       } else {
         appendMessage('bot', `❌ Error: ${payload.error || 'Error desconocido'}`);
       }
     } catch (err) {
-      console.error('Chat personalizado error', err);
-      appendMessage('bot', '❌ Error de conexión al solicitar atención personalizada');
+      console.error('Chat personalizado error:', err);
+      appendMessage('bot', `❌ Error de conexión: ${err.message}`);
     }
   }
 

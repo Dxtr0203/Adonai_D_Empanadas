@@ -6,6 +6,8 @@
   
   <!-- Botón flotante -->
   <div id="chat-toggle" class="btn btn-primary" 
+       data-user-id="{% if user.is_authenticated %}{{ user.id }}{% endif %}"
+       data-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}"
        style="border-radius:50%;width:56px;height:56px;display:flex;align-items:center;justify-content:center;
               box-shadow:0 6px 18px rgba(0,0,0,.12);z-index:2001 !important;"> <!-- ✅ botones prioridad máxima -->
     <i class="bi bi-chat-dots" style="font-size:1.3rem;color:white"></i>
