@@ -37,13 +37,6 @@
     <div id="chat-messages" class="card-body" 
          style="overflow:auto;max-height:500px;height:240px;background:#f8f9fa;flex-shrink:0;"></div>
 
-    <!-- Opciones de chat -->
-    <div id="chat-options" 
-         style="display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:white;border-top:1px solid #eee;
-                z-index:2001 !important;">
-      <!-- botones dinámicos -->
-    </div>
-
     <!-- Input -->
     <div class="card-footer">
       <div class="input-group">
@@ -57,19 +50,19 @@
 <!-- Estilos adicionales -->
 <style>
   /* ✅ Ajustes globales del chat */
-  #chat-widget, #chat-panel, #chat-toggle, #chat-options, #chat-quick-actions, #chat-send, #chat-close {
+  #chat-widget, #chat-panel, #chat-toggle, #chat-quick-actions, #chat-send, #chat-close {
     position: relative;
   }
 
   /* ✅ Botones visibles y consistentes */
-  #chat-options button, #chat-quick-actions button {
+  #chat-quick-actions button {
     cursor: pointer;
     white-space: nowrap;
     z-index: 2001 !important;
   }
 
   /* ✅ Mejor separación */
-  #chat-quick-actions .d-flex, #chat-options {
+  #chat-quick-actions .d-flex {
     gap: 5px;
   }
 
