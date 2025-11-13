@@ -1,6 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Producto, Categoria
+from .models import Producto, Categoria, Empleado
 from django.forms import ModelForm
 from .models import Promotion
 
@@ -95,3 +95,47 @@ class CategoriaForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'maxlength': 100}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'maxlength': 500}),
         }
+
+class EmpleadoForm(forms.ModelForm):
+    class Meta:
+        model = Empleado
+        fields = ['nombre', 'email', 'telefono', 'direccion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'maxlength': 45}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'required': True}),
+            'telefono': forms.TextInput(attrs={'class': 'form-control', 'required': True}),
+            'direccion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'maxlength': 200}),
+        }
+
+    def clean_nombre(self):
+        nombre = self.cleaned_data['nombre'].strip()
+        if len(nombre) > 45:
+            self.add_error('nombre', "El nombre no puede superar los 45 caracteres.")
+        return nombre
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip()
+        if not email or '@' not in email:
+            self.add_error('email', "Ingrese un correo electrónico válido.")
+        return email
+
+    def clean_telefono(self):
+        telefono = self.cleaned_data['telefono'].strip()
+        if not telefono.isdigit():
+            self.add_error('telefono', "El teléfono debe contener solo números.")
+        elif len(telefono) != 8:
+            self.add_error('telefono', "El teléfono debe tener exactamente 8 dígitos.")
+        elif not telefono.startswith(('6', '7')):
+            self.add_error('telefono', "El teléfono debe comenzar con 6 o 7.")
+        return telefono
+
+    def clean_direccion(self):
+        direccion = self.cleaned_data['direccion'].strip()
+        if len(direccion) > 200:
+            self.add_error('direccion', "La dirección no puede superar los 200 caracteres.")
+        return direccion
+
+    def clean(self):
+        data = super().clean()
+        # Add any additional cross-field validation here if needed
+        return data
