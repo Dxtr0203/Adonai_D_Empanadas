@@ -155,29 +155,14 @@ function removeFromCart(productId){
 document.addEventListener('DOMContentLoaded', function(){
   updateCartCount();
 
-  // top navbar cart button (may have href to checkout) -> open modal
-  const topBtn = document.getElementById('top-cart-btn');
-  if(topBtn){
-    topBtn.addEventListener('click', function(e){
-      // if the element has data-bs-toggle assigned elsewhere, let it handle. Otherwise open modal
-      if(this.getAttribute('href') && this.getAttribute('href').indexOf('#') !== 0){
-        e.preventDefault();
-      } else {
-        e.preventDefault();
-      }
-      const modalEl = document.getElementById('cart-modal');
-      if(modalEl){
-        showCart();
-        const m = new bootstrap.Modal(modalEl);
-        m.show();
-      }
-    });
-  }
-
-  // catalog's cart-icon also should populate before modal shown
+  // When cart modal is shown, populate the items
   const modalEl = document.getElementById('cart-modal');
   if(modalEl){
     modalEl.addEventListener('shown.bs.modal', function(){ showCart(); });
+    // Also populate when hidden to ensure clean state
+    modalEl.addEventListener('hidden.bs.modal', function(){ 
+      // Optional: clear any lingering state here if needed
+    });
   }
 
   // protect add-to-cart quantity inputs from typing 'e' or signs
@@ -189,7 +174,17 @@ document.addEventListener('DOMContentLoaded', function(){
   const go = document.getElementById('go-to-checkout');
   if(go){
     go.addEventListener('click', function(evt){
-      if(!cart || cart.length === 0){ evt.preventDefault(); alert('Tu carrito está vacío. Añade productos antes de ir a pagar.'); return false; }
+      if(!cart || cart.length === 0){ 
+        evt.preventDefault(); 
+        alert('Tu carrito está vacío. Añade productos antes de ir a pagar.'); 
+        return false; 
+      }
+      // Close the modal before navigating
+      const modalEl = document.getElementById('cart-modal');
+      if(modalEl){
+        const m = bootstrap.Modal.getInstance(modalEl);
+        if(m) m.hide();
+      }
       return true;
     });
   }

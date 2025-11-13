@@ -12,6 +12,9 @@
 
   const userId = toggle.getAttribute('data-user-id') || null;
   const isAuthenticated = toggle.getAttribute('data-authenticated') === '1';
+  // Toggle to allow anonymous users to request "Atención Personalizada".
+  // Set to `false` to re-enable authentication check later.
+  const ALLOW_ANONYMOUS_PERSONALIZADA = true;
 
   // ==========================
   // Funciones auxiliares
@@ -68,7 +71,8 @@
     const greeted = sessionStorage.getItem('adonai_chat_greeted');
     if(!greeted){
       appendMessage('bot', '¡Hola! 👋 Soy el asistente de Adonai. Puedes escoger una opción rápida o escribir tu pregunta.');
-      renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+      // No quick footer buttons by default — header contains the main quick actions now
+      renderOptions([]);
       sessionStorage.setItem('adonai_chat_greeted', '1');
     }
 
@@ -82,9 +86,16 @@
 
   function quickHandler(e){
     const text = e.currentTarget.textContent.trim();
-    appendMessage('me', text);
+    // Do NOT append here to avoid duplicate messages; handlers (sendOption/sendText)
+    // will be responsible for appending the user's message once.
     renderOptions([]);
-    setTimeout(() => sendText(text), 50);
+    setTimeout(() => {
+      if (text === 'Atención Personalizada') {
+        sendOption(text);
+      } else {
+        sendText(text);
+      }
+    }, 50);
   }
 
   // ==========================
@@ -92,6 +103,8 @@
   // ==========================
   async function sendText(text){
     if(!text) return;
+    // Show user's message once when sending a plain text option
+    appendMessage('me', text);
     try{
       const body = { message: text };
       if(userId) body.usuario_id = userId;
@@ -116,6 +129,7 @@
   }
 
   async function sendOption(optionText){
+    // sendOption is responsible for showing the user's option once
     appendMessage('me', optionText);
     renderOptions([]);
     
@@ -167,17 +181,15 @@
   // Función para Atención Personalizada (M/M/1)
   // ==========================
   async function sendPersonalizado(text) {
-    if (!userId) {
+    if (!ALLOW_ANONYMOUS_PERSONALIZADA && !userId) {
       appendMessage('bot', '❌ Debes estar autenticado para solicitar atención personalizada.');
-      renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+      renderOptions([]);
       return;
     }
 
     try {
-      const body = { 
-        message: text, 
-        usuario_id: userId 
-      };
+      const body = { message: text };
+      if (userId) body.usuario_id = userId;
       const res = await fetch('/chat/personalizado/', {
         method: 'POST',
         headers: {
@@ -203,16 +215,16 @@
           renderOptions(['Continuar conversación', 'Volver al menú']);
         } else {
           // Si está en la cola, mostrar opción de esperar o volver
-          renderOptions(['Ver mi posición', 'Volver al menú']);
+            renderOptions(['Ver mi posición', 'Volver al menú']);
         }
       } else {
         appendMessage('bot', `❌ Error: ${payload.error || 'Error desconocido'}`);
-        renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+        renderOptions([]);
       }
     } catch (err) {
       console.error('Chat personalizado error', err);
       appendMessage('bot', '❌ Error de conexión al solicitar atención personalizada');
-      renderOptions(['Productos','Categorías','Delivery','Información','Promociones','Atención Personalizada']);
+      renderOptions([]);
     }
   }
 
