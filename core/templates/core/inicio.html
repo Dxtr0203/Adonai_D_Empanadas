@@ -28,8 +28,16 @@
         · <i class="bi bi-geo-alt me-1"></i> La Paz - Bolivia
       </div>
     </div>
+
+    <!-- Carrusel de imágenes -->
     <div class="col-lg-6">
-      <img src="{% static 'img/hero-pets.png' %}" class="w-100 rounded-4 shadow" alt="Adonai Pet Shop" style="object-fit: cover;">
+      <div id="hero-carousel" class="position-relative rounded-4 overflow-hidden shadow">
+        <img src="{% static 'img/imagen1.jpg' %}" class="w-100 hero-img active" alt="Mascota feliz">
+        <img src="{% static 'img/imagen2.jpg' %}" class="w-100 hero-img" alt="Comida para mascotas">
+        <img src="{% static 'img/imagen3.jpg' %}" class="w-100 hero-img" alt="Juguetes para perros">
+        <img src="{% static 'img/imagen4.jpg' %}" class="w-100 hero-img" alt="Juguetes para perros">
+        <img src="{% static 'img/imagen6.jpg' %}" class="w-100 hero-img" alt="Juguetes para perros">
+      </div>
     </div>
   </div>
 </div>
@@ -68,28 +76,34 @@
   <h2 class="display-6 fw-bold text-center mb-4">Nuestros Servicios</h2>
   <div class="row row-cols-1 row-cols-md-3 g-4">
     <div class="col">
-      <div class="card shadow-sm h-100">
-        <img src="{% static 'img/food-service.jpg' %}" class="card-img-top" alt="Alimentos para Mascotas">
+      <div class="card shadow-sm h-100 border-0 service-card">
+        <div class="service-img-container">
+          <img src="{% static 'img/alimentos.jpg' %}" class="card-img-top" alt="Alimentos para Mascotas">
+        </div>
         <div class="card-body">
-          <h5 class="card-title">Alimentos para Mascotas</h5>
+          <h5 class="card-title text-primary fw-semibold">Alimentos para Mascotas</h5>
           <p class="card-text">Encuentra los mejores alimentos para perros, gatos y otras mascotas. Marcas de confianza con los nutrientes necesarios para su salud.</p>
         </div>
       </div>
     </div>
     <div class="col">
-      <div class="card shadow-sm h-100">
-        <img src="{% static 'img/toys-service.jpg' %}" class="card-img-top" alt="Juguetes para Mascotas">
+      <div class="card shadow-sm h-100 border-0 service-card">
+        <div class="service-img-container">
+          <img src="{% static 'img/juguetes.jpg' %}" class="card-img-top" alt="Juguetes para Mascotas">
+        </div>
         <div class="card-body">
-          <h5 class="card-title">Juguetes para Mascotas</h5>
+          <h5 class="card-title text-primary fw-semibold">Juguetes para Mascotas</h5>
           <p class="card-text">Juguetes divertidos y seguros para el entretenimiento de tu mascota. Estimula su mente y manténlos activos.</p>
         </div>
       </div>
     </div>
     <div class="col">
-      <div class="card shadow-sm h-100">
-        <img src="{% static 'img/hygiene-service.jpg' %}" class="card-img-top" alt="Higiene para Mascotas">
+      <div class="card shadow-sm h-100 border-0 service-card">
+        <div class="service-img-container">
+          <img src="{% static 'img/higiene.jpg' %}" class="card-img-top" alt="Higiene para Mascotas">
+        </div>
         <div class="card-body">
-          <h5 class="card-title">Productos de Higiene</h5>
+          <h5 class="card-title text-primary fw-semibold">Productos de Higiene</h5>
           <p class="card-text">Ofrecemos productos para el cuidado y limpieza de tu mascota, desde champús hasta accesorios para baño y salud.</p>
         </div>
       </div>
@@ -123,4 +137,70 @@
   </table>
 </div>
 {% endif %}
+
+<!-- 🎨 Estilos -->
+<style>
+  /* === Carrusel === */
+  #hero-carousel {
+    position: relative;
+    height: 400px;
+  }
+
+  .hero-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+  }
+
+  .hero-img.active {
+    opacity: 1;
+  }
+
+  /* === Tarjetas de servicio === */
+  .service-img-container {
+    overflow: hidden;
+    height: 260px;
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+
+  .service-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease, filter 0.5s ease;
+  }
+
+  .service-card:hover .service-img-container img {
+    transform: scale(1.1);
+    filter: brightness(0.85);
+  }
+
+  .service-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .service-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  }
+</style>
+
+<!-- 🎞️ Carrusel Automático -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const images = document.querySelectorAll("#hero-carousel .hero-img");
+    let index = 0;
+
+    setInterval(() => {
+      images[index].classList.remove("active");
+      index = (index + 1) % images.length;
+      images[index].classList.add("active");
+    }, 4000);
+  });
+</script>
 {% endblock %}

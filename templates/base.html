@@ -12,16 +12,64 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
-    :root{ --brand:#0d6efd; --bg:#f5f7fb; }
-    body { background: var(--bg); }
-    .card { border: none; border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
-    .form-label.required::after { content:" *"; color:#dc3545; }
-    .navbar-brand { font-weight: 700; letter-spacing:.4px; display:flex; align-items:center; gap:.5rem; }
-    .navbar-brand img { height:28px; }
-    footer { font-size: .9rem; }
-    footer a { color: inherit; text-decoration: none; }
-    footer a:hover { color: var(--brand); }
-    .nav-link.active { font-weight: 600; color: var(--brand) !important; }
+    :root {
+      --brand: #0d6efd;
+      --bg: #f5f7fb;
+    }
+
+    body {
+      background: var(--bg);
+    }
+
+    .card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+    }
+
+    .form-label.required::after {
+      content: " *";
+      color: #dc3545;
+    }
+
+    /* === Navbar === */
+    .navbar-brand {
+      font-weight: 700;
+      letter-spacing: .4px;
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      font-size: 1.2rem;
+    }
+
+    .navbar-brand img {
+      height: 55px; /* ⬅️ Tamaño del logo aumentado */
+      width: auto;
+      object-fit: contain;
+    }
+
+    .navbar {
+      padding-top: .6rem;
+      padding-bottom: .6rem;
+    }
+
+    footer {
+      font-size: .9rem;
+    }
+
+    footer a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--brand);
+    }
+
+    .nav-link.active {
+      font-weight: 600;
+      color: var(--brand) !important;
+    }
   </style>
 
   {% block extra_css %}{% endblock %}
@@ -30,8 +78,8 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
   <div class="container">
-   <a class="navbar-brand" href="{% url 'inicio' %}">
-  <img src="{% static 'img/logo.png' %}" alt="Adonai">
+    <a class="navbar-brand" href="{% url 'inicio' %}">
+      <img src="{% static 'img/logo.png' %}" alt="Adonai">
       Adonai
     </a>
 
@@ -47,25 +95,21 @@
             <i class="bi bi-house-door d-lg-none me-1"></i> Inicio
           </a>
         </li>
-      
       </ul>
 
-        <div class="d-none d-lg-flex ms-3 gap-2 align-items-center">
-        <!-- Notification bell -->
+      <div class="d-none d-lg-flex ms-3 gap-2 align-items-center">
+        <!-- Notificaciones -->
         <div id="notif-bell" class="position-relative me-2">
           <button id="bell-btn" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-bell"></i>
           </button>
           <span id="bell-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
         </div>
-        <!-- Registrarse moved to end (replaced chatbot button) -->
+
         <a href="{% url 'catalogo' %}" class="btn btn-outline-primary btn-sm {% if request.path|slice:':10' == '/catalogo/' %}active{% endif %}">
           <i class="bi bi-bag"></i> Catálogo
         </a>
 
-        <!-- Eliminar el botón "+ Agregar Producto" -->
-        <!-- El botón de agregar producto ya fue eliminado -->
-        
         {% url 'carrito' as url_carrito %}
         <a id="top-cart-btn" href="{{ url_carrito|default:'#' }}" class="btn btn-outline-secondary btn-sm" {% if not url_carrito %}rel="nofollow"{% endif %}>
           <i class="bi bi-cart"></i> Carrito
@@ -94,7 +138,6 @@
             </ul>
           </div>
         {% else %}
-          <!-- Registrarse (moved here) -->
           <a href="{% url 'usuarios:register' %}" class="btn btn-outline-success btn-sm">
             <i class="bi bi-person-plus"></i> Registrarse
           </a>
@@ -129,153 +172,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'js/cart.js' %}"></script>
 {% block extra_js %}{% endblock %}
-{# Incluir el widget de chat (parcial) para que esté disponible en todas las páginas #}
 {% include 'chat/widget.html' %}
-
-<!-- Global Cart Modal (available site-wide) -->
-<div class="modal fade" id="cart-modal" tabindex="-1" aria-labelledby="cart-modal-label" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="cart-modal-label">Carrito de Compras</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <div id="cart-items"> <!-- rellenado por JS --> </div>
-      </div>
-      <div class="modal-footer d-flex align-items-center">
-        <div class="me-auto fw-bold">
-          Total: <span id="cart-total">Bs. 0.00</span>
-        </div>
-        <a id="go-to-checkout" class="btn btn-primary" href="{% url 'carrito:checkout' %}">Ir a pagar</a>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Polling simple para notificaciones de productos nuevos
-async function fetchLatestProducts() {
-  try {
-    // Usamos el endpoint de notificaciones no leídas para poblar el contador
-    const res = await fetch('/catalogo/notificaciones/');
-    if (!res.ok) {
-      // Si no está autenticado o hay error, ocultamos el contador
-      document.getElementById('bell-count').style.display = 'none';
-      return;
-    }
-    const data = await res.json();
-    const count = (data.unread && data.unread.length) || 0;
-    const bellCount = document.getElementById('bell-count');
-    if (count > 0) {
-      bellCount.style.display = 'inline-block';
-      bellCount.textContent = count;
-    } else {
-      bellCount.style.display = 'none';
-    }
-    // Guardar los últimos no leídos en una variable global por si se necesita
-    window._unreadNotifs = data.unread || [];
-  } catch (e) {
-    console.error('Error fetching notifications', e);
-  }
-}
-
-// Inicia polling cada 15 segundos
-setInterval(fetchLatestProducts, 15000);
-// Llamada inicial
-fetchLatestProducts();
-
-// Bell dropdown: al hacer clic mostramos la lista de últimos productos
-document.getElementById('bell-btn').addEventListener('click', function (e) {
-  e.preventDefault();
-  let dropdown = document.getElementById('bell-dropdown');
-  if (!dropdown) {
-    dropdown = document.createElement('div');
-    dropdown.id = 'bell-dropdown';
-    dropdown.className = 'card p-2 position-absolute';
-    dropdown.style.right = '0';
-    dropdown.style.top = '40px';
-    dropdown.style.minWidth = '240px';
-    dropdown.style.zIndex = 2000;
-    document.getElementById('notif-bell').appendChild(dropdown);
-  }
-
-  // Pedir notificaciones no leídas para el usuario
-  fetch('/catalogo/notificaciones/').then(r => r.json()).then(payload => {
-    const products = payload.unread || [];
-    if (products.length === 0) {
-      dropdown.innerHTML = '<div class="small text-muted p-2">No hay notificaciones nuevas</div>';
-    } else {
-      dropdown.innerHTML = products.map(p => `
-        <div class="d-flex align-items-center gap-2 p-2 border-bottom notif-item" data-id="${p.id}" data-product-id="${p.producto_id}">
-          <div style="width:48px;height:48px;flex:0 0 48px;overflow:hidden;border-radius:6px;background:#f6f6f6;"></div>
-          <div class="flex-grow-1">
-            <div class="small fw-bold">${p.producto}</div>
-            <div class="small text-muted">${new Date(p.creado_en).toLocaleString()}</div>
-          </div>
-        </div>`).join('');
-
-      // Añadir listeners para marcar como leídas al hacer clic
-      dropdown.querySelectorAll('.notif-item').forEach(el => {
-        el.addEventListener('click', function () {
-          const nid = this.getAttribute('data-id');
-          // POST para marcar como leído
-          fetch('/catalogo/notificaciones/marcar/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]
-            },
-            body: `notification_id=${nid}`
-          }).then(res => res.json()).then(resp => {
-            if (resp.ok) {
-              // remover el item y actualizar el contador
-              this.remove();
-              const bellCount = document.getElementById('bell-count');
-              let newCount = parseInt(bellCount.textContent || '0') - 1;
-              if (newCount <= 0) {
-                bellCount.style.display = 'none';
-              } else {
-                bellCount.textContent = newCount;
-              }
-            }
-          });
-        });
-      });
-    }
-  }).catch(err => console.error('Error loading notifications', err));
-
-  // Toggle visibility
-  dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-});
-</script>
-<script>
-// Auto-filter helper used by catalog and any page that includes
-// inputs with ids `filter-q` and `filter-categoria`.
-(function(){
-  function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
-
-  function submitFilterIfPresent(){
-    try{
-      const q = document.getElementById('filter-q');
-      const cat = document.getElementById('filter-categoria');
-      if(!q && !cat) return;
-      // Find the closest form to either element
-      const form = (q && q.closest('form')) || (cat && cat.closest('form'));
-      if(!form) return;
-      form.submit();
-    }catch(e){ console.error('auto-filter error', e); }
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    const q = document.getElementById('filter-q');
-    const cat = document.getElementById('filter-categoria');
-    const submitDebounced = debounce(submitFilterIfPresent, 500);
-    if(q){ q.addEventListener('input', submitDebounced); }
-    if(cat){ cat.addEventListener('change', submitFilterIfPresent); }
-  });
-})();
-</script>
 </body>
 </html>
