@@ -188,5 +188,41 @@ document.addEventListener('DOMContentLoaded', function(){
       return true;
     });
   }
+
+  // Instant search and category filter for catalog
+  function setupCatalogFilters() {
+    const categorySelect = document.getElementById('category-select');
+    const searchInput = document.getElementById('search-input');
+
+    function updateCatalog() {
+      const category = categorySelect ? categorySelect.value : '';
+      const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+      const items = document.querySelectorAll('.catalog-item');
+      items.forEach(item => {
+        const itemCategory = item.getAttribute('data-category').toLowerCase();
+        const itemName = item.getAttribute('data-name').toLowerCase();
+
+        const matchesCategory = category === 'Todas' || itemCategory === category.toLowerCase();
+        const matchesSearch = !searchTerm || itemName.includes(searchTerm);
+
+        if (matchesCategory && matchesSearch) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    if (categorySelect) {
+      categorySelect.addEventListener('change', updateCatalog);
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', updateCatalog);
+    }
+  }
+
+  setupCatalogFilters();
 });
 
