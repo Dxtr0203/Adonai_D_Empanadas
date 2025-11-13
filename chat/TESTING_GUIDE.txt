@@ -1,0 +1,233 @@
+"""
+GUÍA DE PRUEBA - Sistema de Colas M/M/1 para Adonai Store Chatbot
+
+Este archivo documenta cómo probar la implementación completa del sistema
+de atención personalizada con teoría de colas M/M/1.
+"""
+
+# ============================================================================
+# 1. PRUEBA MANUAL EN NAVEGADOR
+# ============================================================================
+
+"""
+PASO 1: Acceder al sitio web
+- Abre http://127.0.0.1:8000 (o tu dominio)
+- Inicia sesión con una cuenta de usuario
+
+PASO 2: Abrir el chatbot
+- Localiza el botón de chat en la esquina inferior
+- Haz clic para abrir el widget del chat
+
+PASO 3: Hacer clic en "Atención Personalizada"
+- En las opciones rápidas verás: 
+  "Productos", "Categorías", "Delivery", "Información", "Promociones", "Atención Personalizada"
+- Haz clic en "Atención Personalizada"
+
+PASO 4: Verificar respuesta
+- Esperado: Un mensaje indicando que fuiste agregado a la cola
+- Si hay clientes antes que tú, verás tu posición
+- Si es tu turno, recibirás un mensaje diciendo "¡Tu turno ha llegado!"
+
+PASO 5: Simular múltiples usuarios (PRUEBA DE COLA)
+- Abre el navegador en modo incógnito (o segundo navegador) con otro usuario
+- Repite el PASO 2-3 con el segundo usuario
+- Verifica que el segundo usuario vea su posición en la cola
+"""
+
+# ============================================================================
+# 2. PRUEBA CON CURL (Backend)
+# ============================================================================
+
+"""
+# Obtener CSRF Token (si es necesario)
+curl -c cookies.txt http://127.0.0.1:8000/chat/widget/
+
+# POST a /chat/personalizado/
+curl -X POST http://127.0.0.1:8000/chat/personalizado/ \
+  -H "Content-Type: application/json" \
+  -d '{"usuario_id": 1, "message": "Solicito atención personalizada"}'
+
+Respuesta esperada:
+{
+  "ok": true,
+  "reply": "Has sido agregado a la cola de atención personalizada...",
+  "posicion": 1,
+  "estado": "esperando",
+  "chat_id": 123,
+  "suggested": []
+}
+"""
+
+# ============================================================================
+# 3. PRUEBA CON PYTHON (Backend - Django Shell)
+# ============================================================================
+
+"""
+# Acceder a Django shell
+python manage.py shell
+
+# Test 1: Crear un chat con estado "esperando"
+from chat.models import Chat
+from usuarios.models import Usuario
+from django.utils import timezone
+
+usuario = Usuario.objects.first()
+chat = Chat.objects.create(
+    usuario=usuario,
+    estado='esperando',
+    prioridad=1,
+    llegada=timezone.now()
+)
+print(f"Chat creado: {chat.id}, Estado: {chat.estado}")
+
+# Test 2: Verificar la cola
+from chat.views import procesar_cola
+siguiente = procesar_cola()
+print(f"Chat a atender: {siguiente.id if siguiente else 'Ninguno'}")
+
+# Test 3: Calcular posición en la cola
+chats_antes = Chat.objects.filter(
+    estado='esperando',
+    llegada__lt=chat.llegada
+).count()
+print(f"Posición en cola: {chats_antes + 1}")
+
+# Test 4: Marcar como finalizado y calcular duración
+chat.estado = 'finalizado'
+chat.fin_servicio = timezone.now()
+from datetime import timedelta
+# Simular 5 minutos de servicio
+chat.inicio_servicio = chat.fin_servicio - timedelta(minutes=5)
+chat.duracion_segundos = int((chat.fin_servicio - chat.inicio_servicio).total_seconds())
+chat.save()
+print(f"Chat finalizado, duración: {chat.duracion_segundos} segundos")
+
+# Test 5: Calcular métricas M/M/1
+from chat.metrics import calcular_metricas, obtener_estadisticas_cola
+metricas = calcular_metricas(horas_atras=24)
+print("Métricas M/M/1:", metricas)
+
+estadisticas = obtener_estadisticas_cola()
+print("Estadísticas cola actual:", estadisticas)
+"""
+
+# ============================================================================
+# 4. PRUEBA DE ASIGNACIÓN DE PRIORIDAD
+# ============================================================================
+
+"""
+# En Django shell
+from chat.views import asignar_prioridad
+
+# Test de palabras clave
+assert asignar_prioridad("Solicito atención personalizada urgente") == 3
+assert asignar_prioridad("Tengo un reclamo") == 3
+assert asignar_prioridad("Quiero hacer un pedido") == 2
+assert asignar_prioridad("Necesito comprar algo") == 2
+assert asignar_prioridad("Hola, qué tal") == 1
+
+print("✓ Todas las pruebas de prioridad pasaron correctamente")
+"""
+
+# ============================================================================
+# 5. PRUEBA DE FLUJO COMPLETO M/M/1
+# ============================================================================
+
+"""
+ESCENARIO: Simular múltiples clientes entrando a la cola
+
+# En Django shell
+from chat.models import Chat, MensajeChat
+from usuarios.models import Usuario
+from chat.views import procesar_cola, asignar_prioridad
+from django.utils import timezone
+from datetime import timedelta
+
+# Crear 3 usuarios de prueba (asume que existen)
+usuarios = Usuario.objects.all()[:3]
+
+# 1. Cliente 1 llega a la cola
+chat1 = Chat.objects.create(
+    usuario=usuarios[0],
+    estado='esperando',
+    prioridad=asignar_prioridad("Tengo un problema urgente"),
+    llegada=timezone.now() - timedelta(minutes=5)
+)
+print(f"Cliente 1 en cola: {chat1.id}")
+
+# 2. Cliente 2 llega a la cola
+chat2 = Chat.objects.create(
+    usuario=usuarios[1],
+    estado='esperando',
+    prioridad=asignar_prioridad("Quiero comprar algo"),
+    llegada=timezone.now() - timedelta(minutes=2)
+)
+print(f"Cliente 2 en cola: {chat2.id}")
+
+# 3. Procesar la cola (Client 1 debe ser atendido - mayor prioridad y llegó primero)
+siguiente = procesar_cola()
+print(f"Cliente siendo atendido: {siguiente.id}")
+assert siguiente.id == chat1.id, "El cliente con mayor prioridad debe ser atendido"
+
+# 4. Cliente 1 termina su atención
+chat1.estado = 'finalizado'
+chat1.fin_servicio = timezone.now()
+chat1.duracion_segundos = int((chat1.fin_servicio - chat1.inicio_servicio).total_seconds())
+chat1.save()
+print(f"Cliente 1 finalizado, duración: {chat1.duracion_segundos}s")
+
+# 5. Procesar la cola nuevamente (Cliente 2 debe ser atendido)
+siguiente = procesar_cola()
+print(f"Siguiente cliente siendo atendido: {siguiente.id}")
+assert siguiente.id == chat2.id, "El siguiente cliente debe ser atendido"
+
+# 6. Cliente 2 termina
+chat2.estado = 'finalizado'
+chat2.fin_servicio = timezone.now()
+chat2.duracion_segundos = int((chat2.fin_servicio - chat2.inicio_servicio).total_seconds())
+chat2.save()
+print(f"Cliente 2 finalizado, duración: {chat2.duracion_segundos}s")
+
+print("✓ Prueba completa de flujo M/M/1 pasada correctamente")
+"""
+
+# ============================================================================
+# 6. VERIFICAR CAMPOS DE BASE DE DATOS
+# ============================================================================
+
+"""
+# En Django shell
+from chat.models import Chat
+
+# Verificar que los campos necesarios existen
+chat = Chat.objects.first()
+print(f"Usuario: {chat.usuario}")
+print(f"Estado: {chat.estado}")
+print(f"Prioridad: {chat.prioridad}")
+print(f"Llegada: {chat.llegada}")
+print(f"Inicio servicio: {chat.inicio_servicio}")
+print(f"Fin servicio: {chat.fin_servicio}")
+print(f"Duración (segundos): {chat.duracion_segundos}")
+
+# Listar todos los chats
+for chat in Chat.objects.all():
+    print(f"ID: {chat.id}, Usuario: {chat.usuario.nombre}, Estado: {chat.estado}")
+"""
+
+# ============================================================================
+# 7. CHECKLIST DE VERIFICACIÓN
+# ============================================================================
+
+"""
+✓ Campo "Atención Personalizada" aparece en opciones del chat
+✓ Al hacer clic, se crea un registro en tabla Chat con estado='esperando'
+✓ Se muestra la posición en la cola al usuario
+✓ Si el servidor está libre, pasa a 'en_atencion' inmediatamente
+✓ La duración se calcula cuando el chat se marca como 'finalizado'
+✓ Las métricas M/M/1 se calculan correctamente
+✓ Múltiples usuarios pueden estar en la cola simultáneamente
+✓ El endpoint /chat/personalizado/ retorna JSON válido
+✓ Los campos llegada, inicio_servicio, fin_servicio, prioridad se registran
+✓ La lógica FIFO con prioridad funciona correctamente
+✓ Se devuelve la posición en la cola en la respuesta
+"""

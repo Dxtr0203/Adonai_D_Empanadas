@@ -5,8 +5,9 @@ import json
 from django.db import connection
 import logging
 from django.utils.timezone import now
+from django.utils import timezone
 from django.conf import settings
-from django.db.models import Sum
+from django.db.models import Sum, Q
 
 from .models import Chat, MensajeChat  # Asume que estos modelos están definidos
 from usuarios.models import Usuario    # Asume que este modelo está definido
@@ -300,3 +301,157 @@ def chat_send(request):
     logger.debug(f"Respuesta del bot: {reply}, Opciones sugeridas: {suggested}")
 
     return JsonResponse({'ok': True, 'reply': reply, 'suggested': suggested})
+
+
+# ===========================
+# ATENCIÓN PERSONALIZADA (M/M/1)
+# ===========================
+
+def asignar_prioridad(texto):
+    """Asigna prioridad basada en palabras clave del mensaje."""
+    texto = texto.lower()
+    if "urgente" in texto or "reclamo" in texto or "problema" in texto:
+        return 3
+    elif "pedido" in texto or "compra" in texto or "orden" in texto:
+        return 2
+    else:
+        return 1
+
+
+def procesar_cola():
+    """
+    Procesa la cola M/M/1 (un único servidor).
+    Si hay un chat esperando y el servidor está libre, atiéndelo.
+    Retorna el siguiente chat a atender o None.
+    """
+    # Si ya hay un chat en atención, no atender otro (1 servidor)
+    if Chat.objects.filter(estado='en_atencion').exists():
+        return None
+
+    # Buscar siguiente en cola por prioridad (mayor primero) y hora de llegada (FIFO)
+    siguiente = Chat.objects.filter(estado='esperando').order_by('-prioridad', 'llegada').first()
+
+    if siguiente:
+        siguiente.estado = 'en_atencion'
+        siguiente.inicio_servicio = timezone.now()
+        siguiente.save()
+        return siguiente
+    return None
+
+
+@csrf_exempt
+def chat_personalizado(request):
+    """
+    Endpoint para atención personalizada con cola M/M/1.
+    
+    POST /chat/personalizado/
+    {
+        "usuario_id": 1,
+        "message": "Quiero atención personalizada"
+    }
+    
+    Responde:
+    {
+        "ok": true,
+        "reply": "Has sido agregado a la cola...",
+        "posicion": 2,
+        "estado": "esperando"
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    usuario_id = payload.get('usuario_id')
+    mensaje = (payload.get('message') or '').strip()
+
+    if not usuario_id:
+        return JsonResponse({'ok': False, 'error': 'Usuario no autenticado'}, status=403)
+
+    if not mensaje:
+        return JsonResponse({'ok': False, 'error': 'Mensaje vacío'}, status=400)
+
+    try:
+        user = Usuario.objects.get(pk=usuario_id)
+    except Usuario.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Usuario no encontrado'}, status=404)
+
+    # Verificar si el usuario ya tiene un chat activo (esperando o en atención)
+    chat_activo = Chat.objects.filter(
+        usuario=user,
+        estado__in=['esperando', 'en_atencion']
+    ).first()
+
+    if chat_activo:
+        # Usar el chat existente
+        chat = chat_activo
+        nueva_entrada = False
+    else:
+        # Crear nuevo chat con estado "esperando"
+        prioridad = asignar_prioridad(mensaje)
+        chat = Chat.objects.create(
+            usuario=user,
+            estado='esperando',
+            prioridad=prioridad,
+            llegada=timezone.now()
+        )
+        nueva_entrada = True
+
+    # Guardar mensaje del usuario
+    MensajeChat.objects.create(
+        chat=chat,
+        remitente='Usuario',
+        contenido=mensaje
+    )
+
+    # Procesar la cola M/M/1
+    siguiente = procesar_cola()
+
+    # Determinar respuesta según el estado
+    if chat.estado == 'en_atencion':
+        # Este chat está siendo atendido ahora
+        reply = (
+            "🎧 ¡Tu turno ha llegado! Iniciando atención personalizada...\n"
+            "Un momento mientras te conectamos con el asistente.\n"
+            "Cuéntame, ¿en qué te puedo ayudar?"
+        )
+        estado_chat = 'en_atencion'
+        posicion = 0
+    else:
+        # El chat sigue en la cola
+        posicion = Chat.objects.filter(
+            estado='esperando',
+            llegada__lt=chat.llegada
+        ).count() + 1
+
+        if posicion == 1:
+            reply = (
+                "📋 Has sido agregado a la cola de atención personalizada.\n"
+                "¡Eres el siguiente! Tu turno comenzará en breve."
+            )
+        else:
+            reply = (
+                f"📋 Has sido agregado a la cola de atención personalizada.\n"
+                f"Hay {posicion - 1} cliente(s) antes que tú. Tu turno llegará pronto."
+            )
+        estado_chat = 'esperando'
+
+    # Guardar respuesta del bot
+    MensajeChat.objects.create(
+        chat=chat,
+        remitente='Bot',
+        contenido=reply
+    )
+
+    return JsonResponse({
+        'ok': True,
+        'reply': reply,
+        'posicion': posicion,
+        'estado': estado_chat,
+        'chat_id': chat.id,
+        'suggested': []
+    })
