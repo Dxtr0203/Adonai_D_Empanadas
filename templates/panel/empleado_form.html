@@ -9,18 +9,40 @@
     <div class="mb-3">
       <label class="form-label">Nombre</label>
       {{ form.nombre }}
+      {% if form.nombre.errors %}
+        <div class="text-danger">
+          {{ form.nombre.errors|striptags }}
+        </div>
+      {% endif %}
     </div>
     <div class="mb-3">
       <label class="form-label">Email</label>
       {{ form.email }}
+      {% if form.email.errors %}
+        <div class="text-danger">
+          {{ form.email.errors|striptags }}
+        </div>
+      {% endif %}
     </div>
     <div class="mb-3">
       <label class="form-label">Teléfono</label>
       {{ form.telefono }}
+      {% if form.telefono.errors %}
+        <div class="text-danger">
+          {% for error in form.telefono.errors %}
+            {{ error }}
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
     <div class="mb-3">
       <label class="form-label">Dirección</label>
       {{ form.direccion }}
+      {% if form.direccion.errors %}
+        <div class="text-danger">
+          {{ form.direccion.errors|striptags }}
+        </div>
+      {% endif %}
     </div>
     <button class="btn btn-primary">Guardar</button>
   </form>

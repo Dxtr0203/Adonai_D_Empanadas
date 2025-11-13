@@ -18,7 +18,8 @@ urlpatterns = [
     path("register/", views.register, name="register"),
 
     # Ruta para forzar el cambio de contraseña
-    path('force-password-change/', views.ForcePasswordChangeView.as_view(), name='force_password_change'),
+   path('force-password-change/', views.force_password_change, name='force_password_change'),
+
 
     # Rutas de restablecimiento de contraseña (flujo de email)
     path('password_reset/', auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html'), name='password_reset'),
