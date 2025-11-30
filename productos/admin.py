@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Notification, NotificationRead
+from .models import Notification, NotificationRead, Cupon
 
 
 from .models import Promotion
@@ -35,3 +35,27 @@ class PromotionAdmin(admin.ModelAdmin):
 		updated = queryset.update(status='rejected')
 		self.message_user(request, f"{updated} promoción(es) rechazada(s).")
 	reject_promotions.short_description = 'Reject selected promotions'
+
+
+@admin.register(Cupon)
+class CuponAdmin(admin.ModelAdmin):
+	list_display = ('codigo', 'producto', 'porcentaje_descuento', 'estado', 'creado_en', 'usuario')
+	list_filter = ('estado', 'creado_en', 'is_deleted')
+	search_fields = ('codigo', 'producto__nombre')
+	readonly_fields = ('codigo', 'creado_en', 'fecha_uso')
+	
+	fieldsets = (
+		('Información del Cupón', {
+			'fields': ('codigo', 'producto', 'porcentaje_descuento')
+		}),
+		('Precios', {
+			'fields': ('precio_original', 'precio_con_descuento')
+		}),
+		('Estado y Uso', {
+			'fields': ('estado', 'usuario', 'creado_en', 'fecha_uso')
+		}),
+		('Administración', {
+			'fields': ('is_deleted',)
+		}),
+	)
+

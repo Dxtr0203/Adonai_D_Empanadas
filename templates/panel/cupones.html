@@ -1,0 +1,249 @@
+{% extends 'panel/base_panel.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+  .cupon-form {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid #007bff;
+  }
+  .descuento-preview {
+    background: #e7f3ff;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+  }
+  .precio-original {
+    text-decoration: line-through;
+    color: #999;
+  }
+  .precio-descuento {
+    color: #28a745;
+    font-weight: bold;
+    font-size: 1.25rem;
+  }
+  .codigo-cupon {
+    background: #fff3cd;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: bold;
+    font-family: monospace;
+    display: inline-block;
+    margin-top: 1rem;
+  }
+  table.table {
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .estado-activo {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+  .estado-desactivado {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+  .no-uses {
+    color: #999;
+    font-style: italic;
+  }
+</style>
+
+<h1>Cupones y Descuentos</h1>
+
+<!-- Separador Promociones/Cupones -->
+<div style="border-top: 3px solid #007bff; margin: 3rem 0 2rem 0;"></div>
+<h2 style="color: #007bff; margin-bottom: 1.5rem;">🎟️ CUPONES</h2>
+
+<!-- Formulario de creación de cupones -->
+<div class="cupon-form">
+  <h3>Generar Nuevo Cupón</h3>
+  <form method="post" id="cupon-form">
+    {% csrf_token %}
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="producto_id" class="form-label">Producto *</label>
+          <select name="producto_id" id="producto_id" class="form-select" required>
+            <option value="">-- Selecciona un producto --</option>
+            {% for producto in productos %}
+              <option value="{{ producto.id }}" data-precio="{{ producto.precio }}">
+                {{ producto.nombre }} (Bs {{ producto.precio|floatformat:2 }})
+              </option>
+            {% endfor %}
+          </select>
+          <small class="text-muted">Elige el producto al que deseas aplicar el cupón</small>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="porcentaje_descuento" class="form-label">Porcentaje de Descuento (1-50%) *</label>
+          <div class="input-group">
+            <input type="number" name="porcentaje_descuento" id="porcentaje_descuento" 
+                   class="form-control" min="1" max="50" step="1" 
+                   placeholder="Ej: 15" required>
+            <span class="input-group-text">%</span>
+          </div>
+          <small class="text-muted">Ingresa solo números entre 1 y 50</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista previa del descuento -->
+    <div id="descuento-preview" class="descuento-preview" style="display: none;">
+      <h5>Previsualización de Descuento</h5>
+      <p>
+        Producto: <strong id="preview-producto">-</strong><br>
+        Precio Original: <span class="precio-original">Bs <span id="preview-original">0.00</span></span><br>
+        Descuento: <strong id="preview-descuento">0%</strong><br>
+        <span class="precio-descuento">Precio Final: Bs <span id="preview-final">0.00</span></span>
+      </p>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3">
+      <i class="bi bi-plus-circle"></i> Generar Código de Cupón
+    </button>
+  </form>
+</div>
+
+<!-- Historial de Cupones -->
+<h3>Historial de Cupones</h3>
+
+{% if cupones %}
+  <div class="table-responsive">
+    <table class="table table-hover table-striped">
+      <thead class="table-light">
+        <tr>
+          <th>Código</th>
+          <th>Producto</th>
+          <th>Descuento</th>
+          <th>Precio Original</th>
+          <th>Precio Final</th>
+          <th>Estado</th>
+          <th>Fecha de Creación</th>
+          <th>Fecha de Uso</th>
+          <th>Cliente que lo Utilizó</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cupon in cupones %}
+          <tr>
+            <td>
+              <span class="codigo-cupon">{{ cupon.codigo }}</span>
+            </td>
+            <td>{{ cupon.producto.nombre }}</td>
+            <td>{{ cupon.porcentaje_descuento }}%</td>
+            <td>Bs {{ cupon.precio_original|floatformat:2 }}</td>
+            <td>Bs {{ cupon.precio_con_descuento|floatformat:2 }}</td>
+            <td>
+              {% if cupon.estado == 'Activo' %}
+                <span class="estado-activo">✓ Activo</span>
+              {% else %}
+                <span class="estado-desactivado">✗ Desactivado</span>
+              {% endif %}
+            </td>
+            <td>{{ cupon.creado_en|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if cupon.fecha_uso %}
+                {{ cupon.fecha_uso|date:"d/m/Y H:i" }}
+              {% else %}
+                <span class="no-uses">No utilizado</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if cupon.usuario %}
+                {{ cupon.usuario.nombre }}
+              {% else %}
+                <span class="no-uses">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'panel:cupones_delete' cupon.id %}" class="btn btn-sm btn-outline-danger"
+                 title="Eliminar cupón">
+                🗑️ Eliminar
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No hay cupones creados aún. ¡Crea uno nuevo usando el formulario arriba!
+  </div>
+{% endif %}
+
+<script>
+  // Actualizar previsualización del descuento en tiempo real
+  const productoSelect = document.getElementById('producto_id');
+  const porcentajeInput = document.getElementById('porcentaje_descuento');
+  const previewDiv = document.getElementById('descuento-preview');
+  const previewProducto = document.getElementById('preview-producto');
+  const previewOriginal = document.getElementById('preview-original');
+  const previewDescuento = document.getElementById('preview-descuento');
+  const previewFinal = document.getElementById('preview-final');
+
+  function actualizarPreview() {
+    const productoOption = productoSelect.options[productoSelect.selectedIndex];
+    const precio = parseFloat(productoOption.dataset.precio) || 0;
+    const porcentaje = parseInt(porcentajeInput.value) || 0;
+
+    if (productoSelect.value && porcentajeInput.value) {
+      const nombreProducto = productoOption.text;
+      const descuentoMonto = (precio * porcentaje) / 100;
+      const precioFinal = precio - descuentoMonto;
+
+      previewProducto.textContent = nombreProducto;
+      previewOriginal.textContent = precio.toFixed(2);
+      previewDescuento.textContent = porcentaje + '%';
+      previewFinal.textContent = precioFinal.toFixed(2);
+      previewDiv.style.display = 'block';
+    } else {
+      previewDiv.style.display = 'none';
+    }
+  }
+
+  productoSelect.addEventListener('change', actualizarPreview);
+  porcentajeInput.addEventListener('input', actualizarPreview);
+
+  // Validar porcentaje al escribir
+  porcentajeInput.addEventListener('input', function() {
+    let value = parseInt(this.value);
+    if (this.value && (value < 1 || value > 50)) {
+      this.classList.add('is-invalid');
+    } else {
+      this.classList.remove('is-invalid');
+    }
+  });
+
+  // Validar al enviar el formulario
+  document.getElementById('cupon-form').addEventListener('submit', function(e) {
+    const producto = productoSelect.value;
+    const porcentaje = parseInt(porcentajeInput.value);
+
+    if (!producto) {
+      e.preventDefault();
+      alert('Por favor selecciona un producto.');
+      return false;
+    }
+
+    if (!porcentaje || porcentaje < 1 || porcentaje > 50) {
+      e.preventDefault();
+      alert('El porcentaje debe estar entre 1 y 50.');
+      return false;
+    }
+  });
+</script>
+
+{% endblock %}
