@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 client = None
 if GEMINI_AVAILABLE:
     try:
-        client = genai.Client(api_key="AIzaSyAiRhg6_u2EiwZKU7DWbdu-7UZBnP_Lhx4")
+        client = genai.Client(api_key="AIzaSyA7MsTs9K6VZJVOpjdxPi5oY9snaO5fZ3c")
         print("Inicializando cliente Gemini 2.5...")
         logger.info("Cliente Gemini 2.5 inicializado correctamente.")
     except Exception as e:
