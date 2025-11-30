@@ -2,7 +2,10 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q, F
+from django.db.models import Q, F, Sum, Count
+from django.http import HttpResponse
+from django.utils import timezone
+from datetime import datetime, timedelta
 
 from .models import Producto, Categoria, Promocion, Promotion
 from .forms import ProductoForm, CategoriaForm
@@ -21,12 +24,153 @@ from django.contrib.auth.models import Group
 @login_required
 @group_required("Admin", "Empleado")
 def dashboard(request):
-    # Productos con stock igual o por debajo del mínimo
+    from django.utils import timezone
+    from django.db.models import Sum, Count, Q
+    from datetime import timedelta
+    from ventas.models import Venta, VentaDetalle
+    
+    # Obtener fechas del request (filtros personalizados)
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str = request.GET.get('fecha_fin', '')
+    
+    hoy = timezone.localdate()
+    
+    # Parsear fechas si se proporcionan
+    if fecha_inicio_str and fecha_fin_str:
+        try:
+            fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+            fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_inicio = hoy - timedelta(days=30)
+            fecha_fin = hoy
+    else:
+        # Default: últimos 30 días
+        fecha_inicio = hoy - timedelta(days=30)
+        fecha_fin = hoy
+    
+    # Calcular hace_7_dias desde fecha_fin
+    hace_7_dias = fecha_fin - timedelta(days=7)
+    
+    # Convertir dates a datetimes para filtrado correcto con timezones
+    dt_inicio = timezone.make_aware(datetime.combine(fecha_inicio, datetime.min.time()))
+    dt_fin = timezone.make_aware(datetime.combine(fecha_fin, datetime.max.time()))
+    dt_hace_7 = timezone.make_aware(datetime.combine(hace_7_dias, datetime.min.time()))
+    
+    # ===== INVENTARIO =====
     low_stock = Producto.objects.filter(stock_actual__lte=F("stock_minimo")).select_related("categoria")
     total_prod = Producto.objects.count()
+    stock_total = Producto.objects.aggregate(total=Sum('stock_actual'))['total'] or 0
+    productos_sin_stock = Producto.objects.filter(stock_actual=0).count()
+    
+    # Productos por categoría (para gráfico)
+    productos_por_categoria = list(
+        Categoria.objects.annotate(cantidad=Count('producto')).values('nombre', 'cantidad').order_by('-cantidad')
+    )
+    
+    # ===== RENTABILIDAD POR CATEGORÍA =====
+    rentabilidad_categoria = list(
+        VentaDetalle.objects.filter(venta__creado_en__gte=dt_inicio, venta__creado_en__lte=dt_fin)
+        .values('producto__categoria__nombre')
+        .annotate(
+            total_vendido=Sum('cantidad'),
+            ingresos=Sum('subtotal'),
+            num_ventas=Count('venta', distinct=True)
+        )
+        .order_by('-ingresos')
+    )
+    
+    # ===== VENTAS =====
+    # Ventas en el rango de fechas
+    ventas_rango = Venta.objects.filter(creado_en__gte=dt_inicio, creado_en__lte=dt_fin)
+    total_ventas_rango = ventas_rango.aggregate(total=Sum('total'))['total'] or 0
+    cantidad_ventas_rango = ventas_rango.count()
+    
+    # Ventas últimos 7 días dentro del rango
+    ventas_7d = Venta.objects.filter(creado_en__gte=dt_hace_7, creado_en__lte=dt_fin)
+    total_ventas_7d = ventas_7d.aggregate(total=Sum('total'))['total'] or 0
+    
+    # Ventas por estado
+    ventas_por_estado = list(
+        Venta.objects.filter(creado_en__gte=dt_inicio, creado_en__lte=dt_fin)
+        .values('estado').annotate(cantidad=Count('id')).order_by('estado')
+    )
+    
+    # Ventas por fecha (gráfico de línea)
+    ventas_por_fecha = []
+    dias = (fecha_fin - fecha_inicio).days + 1
+    for i in range(dias):
+        fecha = fecha_inicio + timedelta(days=i)
+        # Crear rango datetime para cada día
+        dt_dia_inicio = timezone.make_aware(datetime.combine(fecha, datetime.min.time()))
+        dt_dia_fin = timezone.make_aware(datetime.combine(fecha, datetime.max.time()))
+        total = Venta.objects.filter(creado_en__gte=dt_dia_inicio, creado_en__lte=dt_dia_fin).aggregate(total=Sum('total'))['total'] or 0
+        ventas_por_fecha.append({
+            'fecha': fecha.strftime('%a %d'),
+            'total': float(total)
+        })
+    
+    # Métodos de pago más usados
+    metodos_pago = list(
+        Venta.objects.filter(creado_en__gte=dt_inicio, creado_en__lte=dt_fin)
+        .values('metodo_pago')
+        .annotate(cantidad=Count('id'))
+        .order_by('-cantidad')
+    )
+    
+    # ===== CLIENTES =====
+    total_clientes = Usuario.objects.filter(rol__nombre__iexact='Cliente').count()
+    clientes_nuevos_rango = Usuario.objects.filter(
+        rol__nombre__iexact='Cliente',
+        creado_en__gte=dt_inicio, creado_en__lte=dt_fin
+    ).count()
+    
+    # Clientes más activos (mayor cantidad de compras)
+    clientes_top = list(
+        Usuario.objects.filter(rol__nombre__iexact='Cliente')
+        .annotate(num_compras=Count('venta'))
+        .filter(num_compras__gt=0)
+        .order_by('-num_compras')
+        .values('nombre', 'num_compras', 'email')[:5]
+    )
+    
+    # Productos más vendidos
+    top_productos = list(
+        VentaDetalle.objects.filter(venta__creado_en__gte=dt_inicio, venta__creado_en__lte=dt_fin)
+        .values('producto__nombre')
+        .annotate(total_vendido=Sum('cantidad'), ingresos=Sum('subtotal'))
+        .order_by('-total_vendido')[:5]
+    )
+    
     return render(request, "panel/dashboard.html", {
+        # Filtros
+        "fecha_inicio": fecha_inicio.isoformat(),
+        "fecha_fin": fecha_fin.isoformat(),
+        
+        # Inventario
         "total_prod": total_prod,
+        "stock_total": stock_total,
+        "productos_sin_stock": productos_sin_stock,
         "low_stock": low_stock[:8],
+        "productos_por_categoria": productos_por_categoria,
+        
+        # Ventas
+        "total_ventas_7d": float(total_ventas_7d),
+        "total_ventas_rango": float(total_ventas_rango),
+        "cantidad_ventas_rango": cantidad_ventas_rango,
+        "ventas_por_fecha": ventas_por_fecha,
+        "ventas_por_estado": ventas_por_estado,
+        "metodos_pago": metodos_pago,
+        
+        # Clientes
+        "total_clientes": total_clientes,
+        "clientes_nuevos_rango": clientes_nuevos_rango,
+        "clientes_top": clientes_top,
+        
+        # Productos más vendidos
+        "top_productos": top_productos,
+        
+        # Rentabilidad
+        "rentabilidad_categoria": rentabilidad_categoria,
     })
 
 
@@ -147,6 +291,14 @@ def categoria_update(request, pk):
 @permission_required("productos.delete_categoria", raise_exception=True)
 def categoria_delete(request, pk):
     c = get_object_or_404(Categoria, pk=pk)
+    
+    # Verificar si hay productos asociados
+    productos_asociados = c.producto_set.count()
+    
+    if productos_asociados > 0:
+        messages.error(request, f"No se puede eliminar la categoría «{c.nombre}» porque tiene {productos_asociados} producto(s) asociado(s). Primero debes asignar estos productos a otra categoría o eliminarlos.")
+        return redirect("panel:categoria_list")
+    
     if request.method == "POST":
         nombre = c.nombre
         c.delete()
@@ -622,3 +774,291 @@ def cupones_delete(request, pk):
         return redirect('panel:cupones')
     
     return render(request, 'panel/confirm_delete.html', {'obj': cupon, 'tipo': 'Cupón'})
+
+
+# --------- EXPORTAR DASHBOARD ---------
+@login_required
+@group_required("Admin", "Empleado")
+def export_dashboard_pdf(request):
+    """Exportar dashboard como PDF."""
+    from io import BytesIO
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib import colors
+    from django.utils import timezone
+    from datetime import timedelta
+    from ventas.models import Venta, VentaDetalle
+    
+    # Obtener fechas del request
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str = request.GET.get('fecha_fin', '')
+    
+    hoy = timezone.localdate()
+    if fecha_inicio_str and fecha_fin_str:
+        try:
+            fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+            fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_inicio = hoy - timedelta(days=30)
+            fecha_fin = hoy
+    else:
+        fecha_inicio = hoy - timedelta(days=30)
+        fecha_fin = hoy
+    
+    # Obtener datos
+    ventas_rango = Venta.objects.filter(creado_en__date__range=(fecha_inicio, fecha_fin))
+    total_ventas = ventas_rango.aggregate(total=Sum('total'))['total'] or 0
+    cantidad_ventas = ventas_rango.count()
+    
+    top_productos = list(
+        VentaDetalle.objects.filter(venta__creado_en__date__range=(fecha_inicio, fecha_fin))
+        .values('producto__nombre')
+        .annotate(total_vendido=Sum('cantidad'), ingresos=Sum('subtotal'))
+        .order_by('-total_vendido')[:5]
+    )
+    
+    rentabilidad = list(
+        VentaDetalle.objects.filter(venta__creado_en__date__range=(fecha_inicio, fecha_fin))
+        .values('producto__categoria__nombre')
+        .annotate(total_vendido=Sum('cantidad'), ingresos=Sum('subtotal'), num_ventas=Count('venta', distinct=True))
+        .order_by('-ingresos')
+    )
+    
+    # Crear PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Título
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#667eea'), spaceAfter=30)
+    elements.append(Paragraph('REPORTE DE DASHBOARD', title_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Información de fechas
+    info_text = f'<b>Período:</b> {fecha_inicio.strftime("%d/%m/%Y")} al {fecha_fin.strftime("%d/%m/%Y")}'
+    elements.append(Paragraph(info_text, styles['Normal']))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Resumen general
+    elements.append(Paragraph('<b>RESUMEN GENERAL</b>', styles['Heading2']))
+    resumen_data = [
+        ['Métrica', 'Valor'],
+        ['Total de Ventas', f'${float(total_ventas):.2f}'],
+        ['Cantidad de Transacciones', str(cantidad_ventas)],
+        ['Promedio por Transacción', f'${float(total_ventas/cantidad_ventas) if cantidad_ventas > 0 else 0:.2f}'],
+    ]
+    resumen_table = Table(resumen_data, colWidths=[3*inch, 2*inch])
+    resumen_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(resumen_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Top productos
+    elements.append(Paragraph('<b>TOP 5 PRODUCTOS MÁS VENDIDOS</b>', styles['Heading2']))
+    top_data = [['Producto', 'Cantidad', 'Ingresos']]
+    for prod in top_productos:
+        top_data.append([prod['producto__nombre'], str(prod['total_vendido']), f"${prod['ingresos']:.2f}"])
+    
+    top_table = Table(top_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+    top_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(top_table)
+    elements.append(PageBreak())
+    
+    # Rentabilidad por categoría
+    elements.append(Paragraph('<b>ANÁLISIS DE RENTABILIDAD POR CATEGORÍA</b>', styles['Heading2']))
+    rent_data = [['Categoría', 'Unidades', 'Ingresos', 'Ventas', 'Promedio']]
+    for item in rentabilidad:
+        cat = item['producto__categoria__nombre']
+        unid = item['total_vendido']
+        ingr = f"${item['ingresos']:.2f}"
+        vent = item['num_ventas']
+        prom = f"${item['ingresos']/item['num_ventas']:.2f}" if item['num_ventas'] > 0 else '$0.00'
+        rent_data.append([cat, str(unid), ingr, str(vent), prom])
+    
+    rent_table = Table(rent_data, colWidths=[1.5*inch, 1*inch, 1.2*inch, 1*inch, 1.2*inch])
+    rent_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgreen),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(rent_table)
+    
+    # Generar PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.read(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="dashboard_{fecha_inicio}_{fecha_fin}.pdf"'
+    return response
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def export_dashboard_excel(request):
+    """Exportar dashboard como Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from django.utils import timezone
+    from datetime import timedelta
+    from ventas.models import Venta, VentaDetalle
+    
+    # Obtener fechas del request
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str = request.GET.get('fecha_fin', '')
+    
+    hoy = timezone.localdate()
+    if fecha_inicio_str and fecha_fin_str:
+        try:
+            fecha_inicio = timezone.datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+            fecha_fin = timezone.datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_inicio = hoy - timedelta(days=30)
+            fecha_fin = hoy
+    else:
+        fecha_inicio = hoy - timedelta(days=30)
+        fecha_fin = hoy
+    
+    # Obtener datos
+    ventas_rango = Venta.objects.filter(creado_en__date__range=(fecha_inicio, fecha_fin))
+    total_ventas = ventas_rango.aggregate(total=Sum('total'))['total'] or 0
+    cantidad_ventas = ventas_rango.count()
+    
+    top_productos = list(
+        VentaDetalle.objects.filter(venta__creado_en__date__range=(fecha_inicio, fecha_fin))
+        .values('producto__nombre')
+        .annotate(total_vendido=Sum('cantidad'), ingresos=Sum('subtotal'))
+        .order_by('-total_vendido')[:5]
+    )
+    
+    rentabilidad = list(
+        VentaDetalle.objects.filter(venta__creado_en__date__range=(fecha_inicio, fecha_fin))
+        .values('producto__categoria__nombre')
+        .annotate(total_vendido=Sum('cantidad'), ingresos=Sum('subtotal'), num_ventas=Count('venta', distinct=True))
+        .order_by('-ingresos')
+    )
+    
+    # Crear workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Dashboard"
+    
+    # Estilos
+    header_fill = PatternFill(start_color="667eea", end_color="667eea", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    # Título
+    ws['A1'] = f"REPORTE DE DASHBOARD - {fecha_inicio} al {fecha_fin}"
+    ws['A1'].font = Font(bold=True, size=14)
+    ws.merge_cells('A1:E1')
+    
+    # Resumen general
+    row = 3
+    ws[f'A{row}'] = "RESUMEN GENERAL"
+    ws[f'A{row}'].font = Font(bold=True, size=12)
+    
+    row += 1
+    headers = ['Métrica', 'Valor']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+    
+    row += 1
+    data = [
+        ['Total de Ventas', f"${float(total_ventas):.2f}"],
+        ['Cantidad de Transacciones', cantidad_ventas],
+        ['Promedio por Transacción', f"${float(total_ventas/cantidad_ventas) if cantidad_ventas > 0 else 0:.2f}"],
+    ]
+    for row_data in data:
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row, column=col)
+            cell.value = value
+            cell.border = border
+        row += 1
+    
+    # Top productos
+    row += 1
+    ws[f'A{row}'] = "TOP 5 PRODUCTOS MÁS VENDIDOS"
+    ws[f'A{row}'].font = Font(bold=True, size=12)
+    
+    row += 1
+    headers = ['Producto', 'Cantidad', 'Ingresos']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+    
+    row += 1
+    for prod in top_productos:
+        ws.cell(row=row, column=1).value = prod['producto__nombre']
+        ws.cell(row=row, column=2).value = prod['total_vendido']
+        ws.cell(row=row, column=3).value = f"${prod['ingresos']:.2f}"
+        for col in range(1, 4):
+            ws.cell(row=row, column=col).border = border
+        row += 1
+    
+    # Rentabilidad por categoría
+    row += 2
+    ws[f'A{row}'] = "ANÁLISIS DE RENTABILIDAD POR CATEGORÍA"
+    ws[f'A{row}'].font = Font(bold=True, size=12)
+    
+    row += 1
+    headers = ['Categoría', 'Unidades', 'Ingresos', 'Num. Ventas', 'Promedio']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+    
+    row += 1
+    for item in rentabilidad:
+        ws.cell(row=row, column=1).value = item['producto__categoria__nombre']
+        ws.cell(row=row, column=2).value = item['total_vendido']
+        ws.cell(row=row, column=3).value = f"${item['ingresos']:.2f}"
+        ws.cell(row=row, column=4).value = item['num_ventas']
+        ws.cell(row=row, column=5).value = f"${item['ingresos']/item['num_ventas']:.2f}" if item['num_ventas'] > 0 else '$0.00'
+        for col in range(1, 6):
+            ws.cell(row=row, column=col).border = border
+        row += 1
+    
+    # Ajustar ancho de columnas
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 15
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 15
+    
+    # Generar archivo
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="dashboard_{fecha_inicio}_{fecha_fin}.xlsx"'
+    wb.save(response)
+    return response

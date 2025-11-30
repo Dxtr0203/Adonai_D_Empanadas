@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, resolve_url
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, update_session_auth_hash
+from django.contrib.auth import authenticate, login, update_session_auth_hash, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordChangeView
 from django.contrib.auth.decorators import login_required
@@ -200,3 +200,14 @@ def force_password_change(request):
         form = PasswordChangeForm()
 
     return render(request, 'usuarios/force_password_change.html', {'form': form})
+
+
+# ======================
+# LOGOUT PERSONALIZADO
+# ======================
+@login_required
+def custom_logout(request):
+    """Cierra la sesión completamente y redirige a inicio."""
+    logout(request)
+    messages.success(request, "Has cerrado sesión correctamente.")
+    return redirect('inicio')

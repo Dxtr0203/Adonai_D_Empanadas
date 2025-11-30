@@ -8,8 +8,8 @@ urlpatterns = [
     # Ruta de login usando la vista personalizada (para soportar must_change_password)
     path("login/", views.custom_login, name="login"),
     
-    # Ruta de logout
-    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    # Ruta de logout personalizado (cierra sesión y redirige a inicio)
+    path("logout/", views.custom_logout, name="logout"),
 
     # Ruta para el perfil del usuario
     path("perfil/", views.perfil, name="perfil"),
