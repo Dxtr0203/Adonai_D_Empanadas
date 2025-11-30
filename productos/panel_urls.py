@@ -34,6 +34,9 @@ urlpatterns = [
     # Cupones
     path("cupones/", views.cupones_list, name="cupones"),
     path("cupones/<int:pk>/eliminar/", views.cupones_delete, name="cupones_delete"),
+    # Exportar dashboard
+    path("exportar/pdf/", views.export_dashboard_pdf, name="export_dashboard_pdf"),
+    path("exportar/excel/", views.export_dashboard_excel, name="export_dashboard_excel"),
     # Area para empleados (limitada)
     path("empleados/area/", views_emp.empleado_dashboard, name="empleado_area_dashboard"),
     path("empleados/area/inventario/", views_emp.empleado_inventario, name="empleado_area_inventario"),

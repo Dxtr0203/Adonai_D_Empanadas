@@ -1,35 +1,438 @@
 {% extends "panel/base_panel.html" %}
-{% block title %}Resumen{% endblock %}
-{% block content %}
-<h2 class="mb-4">Resumen</h2>
+{% block title %}Dashboard{% endblock %}
 
-<div class="row g-4">
-  <div class="col-md-6">
-    <div class="card p-3">
-      <div class="text-muted">Productos totales</div>
-      <div class="display-6">{{ total_prod }}</div>
+{% block content %}
+<style>
+    .kpi-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 20px;
+    }
+    .kpi-card.orange {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .kpi-card.blue {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .kpi-card.green {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    .kpi-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    .kpi-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .chart-container {
+        position: relative;
+        height: 400px;
+        margin-bottom: 40px;
+    }
+    .tab-content {
+        border: 1px solid #dee2e6;
+        border-top: none;
+        padding: 20px;
+        border-radius: 0 0 5px 5px;
+    }
+    .nav-tabs .nav-link {
+        color: #495057;
+        border: 1px solid transparent;
+        border-bottom: 2px solid transparent;
+    }
+    .nav-tabs .nav-link.active {
+        background-color: #f8f9fa;
+        border-bottom-color: #667eea;
+    }
+    .filter-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Dashboard</h2>
+    <div class="btn-group" role="group">
+        <a href="{% url 'panel:export_dashboard_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="btn btn-sm btn-danger">
+            📥 Descargar PDF
+        </a>
+        <a href="{% url 'panel:export_dashboard_excel' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="btn btn-sm btn-success">
+            📥 Descargar Excel
+        </a>
     </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card p-3">
-      <div class="d-flex justify-content-between align-items-center">
-        <div><strong>Alertas de stock</strong></div>
-        <a class="btn btn-sm btn-outline-primary" href="{% url 'panel:inventario_list' %}">Ver todas</a>
-      </div>
-      <hr class="my-2">
-      {% if low_stock %}
-        <ul class="list-group list-group-flush">
-          {% for p in low_stock %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <span>{{ p.nombre }}</span>
-              <span class="badge bg-danger">Stock: {{ p.stock_actual }}</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="text-success">Sin alertas ✅</div>
-      {% endif %}
-    </div>
-  </div>
 </div>
+
+<!-- Filtros de fecha -->
+<div class="filter-card">
+    <form method="get" class="row g-2" id="filterForm">
+        <div class="col-md-4">
+            <label for="fecha_inicio" class="form-label">Desde</label>
+            <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}">
+        </div>
+        <div class="col-md-4">
+            <label for="fecha_fin" class="form-label">Hasta</label>
+            <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}">
+        </div>
+        <div class="col-md-4">
+            <label>&nbsp;</label>
+            <div>
+                <button type="submit" class="btn btn-primary">🔍 Filtrar</button>
+                <a href="{% url 'panel:dashboard' %}" class="btn btn-secondary">↻ Reset</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- KPIs Principales -->
+<div class="row g-3 mb-5">
+    <!-- Ventas en rango -->
+    <div class="col-md-3">
+        <div class="card kpi-card">
+            <div class="kpi-label">Ventas (período)</div>
+            <div class="kpi-value">Bs. {{ total_ventas_rango|floatformat:0 }}</div>
+            <small>{{ cantidad_ventas_rango }} transacciones</small>
+        </div>
+    </div>
+    <!-- Total Clientes -->
+    <div class="col-md-3">
+        <div class="card kpi-card orange">
+            <div class="kpi-label">Clientes totales</div>
+            <div class="kpi-value">{{ total_clientes }}</div>
+            <small>+{{ clientes_nuevos_rango }} nuevos en período</small>
+        </div>
+    </div>
+    <!-- Inventario -->
+    <div class="col-md-3">
+        <div class="card kpi-card blue">
+            <div class="kpi-label">Stock Total</div>
+            <div class="kpi-value">{{ stock_total }}</div>
+            <small>{{ productos_sin_stock }} productos sin stock</small>
+        </div>
+    </div>
+    <!-- Productos -->
+    <div class="col-md-3">
+        <div class="card kpi-card green">
+            <div class="kpi-label">Productos activos</div>
+            <div class="kpi-value">{{ total_prod }}</div>
+            <small><a href="{% url 'panel:inventario_list' %}" class="text-white text-decoration-none">Ver inventario</a></small>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs para secciones -->
+<ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="ventas-tab" data-bs-toggle="tab" data-bs-target="#ventas" type="button">Ventas</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="inventario-tab" data-bs-toggle="tab" data-bs-target="#inventario" type="button">Inventario</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="clientes-tab" data-bs-toggle="tab" data-bs-target="#clientes" type="button">Clientes</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="dashboardTabContent">
+    <!-- TAB VENTAS -->
+    <div class="tab-pane fade show active" id="ventas" role="tabpanel">
+        <div class="row g-4">
+            <!-- Gráfico de Ventas por Fecha -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Ventas por fecha</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartVentasFecha"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+
+
+        <div class="row g-4 mt-2">
+            <!-- Productos más vendidos -->
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Top 5 productos vendidos</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if top_productos %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th class="text-end">Cantidad</th>
+                                            <th class="text-end">Ingresos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for prod in top_productos %}
+                                            <tr>
+                                                <td>{{ prod.producto__nombre }}</td>
+                                                <td class="text-end"><span class="badge bg-info">{{ prod.total_vendido }}</span></td>
+                                                <td class="text-end">Bs. {{ prod.ingresos|floatformat:0 }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Sin ventas en el período seleccionado</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB INVENTARIO -->
+    <div class="tab-pane fade" id="inventario" role="tabpanel">
+        <div class="row g-4">
+            <!-- Gráfico Productos por Categoría -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Productos por categoría</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartProductosCategoria"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alertas de Stock -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Productos con Stock Bajo</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if low_stock %}
+                            <div style="max-height: 500px; overflow-y: auto;">
+                                <ul class="list-group list-group-flush">
+                                    {% for p in low_stock %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <div><strong>{{ p.nombre }}</strong></div>
+                                                <small class="text-muted">{{ p.categoria.nombre }}</small>
+                                            </div>
+                                            <span class="badge {% if p.stock_actual == 0 %}bg-danger{% elif p.stock_actual <= p.stock_minimo %}bg-warning{% endif %}">
+                                                {{ p.stock_actual }}
+                                            </span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-success" role="alert">
+                                ✅ Todos los productos tienen stock adecuado
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rentabilidad por Categoría -->
+        <div class="row g-4 mt-2">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">📊 Análisis de Rentabilidad por Categoría</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if rentabilidad_categoria %}
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Categoría</th>
+                                            <th class="text-end">Unidades Vendidas</th>
+                                            <th class="text-end">Ingresos Totales</th>
+                                            <th class="text-end">Número de Ventas</th>
+                                            <th class="text-end">Ingreso Promedio</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in rentabilidad_categoria %}
+                                            <tr>
+                                                <td><strong>{{ item.producto__categoria__nombre }}</strong></td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-primary">{{ item.total_vendido }}</span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <strong class="text-success">Bs. {{ item.ingresos|floatformat:2 }}</strong>
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-info">{{ item.num_ventas }}</span>
+                                                </td>
+                                                <td class="text-end">
+                                                    ${% widthratio item.ingresos item.num_ventas 1 %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Sin datos de ventas en el período seleccionado</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB CLIENTES -->
+    <div class="tab-pane fade" id="clientes" role="tabpanel">
+        <div class="row g-4">
+            <!-- Clientes más activos -->
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Top 5 clientes (compras)</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if clientes_top %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th class="text-end">Compras</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cliente in clientes_top %}
+                                            <tr>
+                                                <td>
+                                                    <div><strong>{{ cliente.nombre }}</strong></div>
+                                                    <small class="text-muted">{{ cliente.email }}</small>
+                                                </td>
+                                                <td class="text-end"><span class="badge bg-primary">{{ cliente.num_compras }}</span></td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Sin datos de clientes</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumen de Clientes -->
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Resumen de Clientes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="p-3 bg-light rounded">
+                                    <div class="text-muted">Total de clientes</div>
+                                    <div class="display-5">{{ total_clientes }}</div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="p-3 bg-light rounded">
+                                    <div class="text-muted">Nuevos clientes (período)</div>
+                                    <div class="display-5">{{ clientes_nuevos_rango }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+    // Colores reutilizables
+    const colors = {
+        primary: 'rgba(102, 126, 234, 1)',
+        secondary: 'rgba(118, 75, 162, 1)',
+        success: 'rgba(67, 233, 123, 1)',
+        warning: 'rgba(255, 193, 7, 1)',
+        danger: 'rgba(245, 87, 108, 1)',
+        info: 'rgba(79, 172, 254, 1)',
+        light: 'rgba(248, 249, 250, 1)',
+        dark: 'rgba(52, 58, 64, 1)',
+    };
+
+    // 1. Gráfico de Ventas por Fecha (Línea)
+    const ventasFechaData = {{ ventas_por_fecha|safe }};
+    const ctx1 = document.getElementById('chartVentasFecha').getContext('2d');
+    new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: ventasFechaData.map(d => d.fecha),
+            datasets: [{
+                label: 'Ventas ($)',
+                data: ventasFechaData.map(d => d.total),
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 5,
+                pointBackgroundColor: colors.primary,
+                pointHoverRadius: 7,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: v => 'Bs. ' + v } }
+            }
+        }
+    });
+
+    // 2. Gráfico Productos por Categoría (Horizontal Bar)
+    const productosCategoriaData = {{ productos_por_categoria|safe }};
+    const ctx4 = document.getElementById('chartProductosCategoria').getContext('2d');
+    new Chart(ctx4, {
+        type: 'bar',
+        data: {
+            labels: productosCategoriaData.map(d => d.nombre),
+            datasets: [{
+                label: 'Cantidad de productos',
+                data: productosCategoriaData.map(d => d.cantidad),
+                backgroundColor: colors.info,
+                borderColor: 'rgba(79, 172, 254, 0.8)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { legend: { display: true } },
+            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+</script>
 {% endblock %}

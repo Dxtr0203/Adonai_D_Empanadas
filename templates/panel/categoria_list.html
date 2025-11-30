@@ -17,6 +17,7 @@
             <th style="width:80px">#</th>
             <th>Nombre</th>
             <th style="width:180px">Productos</th>
+            <th style="width:200px">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -26,6 +27,10 @@
               <td>{{ c.nombre }}</td>
               <td>
                 {{ c.producto_set.count }}
+              </td>
+              <td>
+                <a href="{% url 'panel:categoria_update' c.id %}" class="btn btn-sm btn-warning">✏️ Editar</a>
+                <a href="{% url 'panel:categoria_delete' c.id %}" class="btn btn-sm btn-danger">🗑️ Eliminar</a>
               </td>
             </tr>
           {% endfor %}
