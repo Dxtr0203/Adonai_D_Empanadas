@@ -189,3 +189,39 @@ class Empleado(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class Cupon(models.Model):
+    """Modelo para gestionar cupones de descuento con un único uso."""
+    from django.core.validators import MinValueValidator, MaxValueValidator
+    
+    ESTADO_CHOICES = (
+        ('Activo', 'Activo'),
+        ('Desactivado', 'Desactivado'),
+    )
+    
+    codigo = models.CharField(max_length=6, unique=True)
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='cupones', db_constraint=False)
+    porcentaje_descuento = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(50)]
+    )
+    precio_original = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_con_descuento = models.DecimalField(max_digits=10, decimal_places=2)
+    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='Activo')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    fecha_uso = models.DateTimeField(null=True, blank=True)
+    usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='cupones_utilizados', db_constraint=False)
+    is_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Cupón {self.codigo} - {self.producto.nombre}"
+
+    class Meta:
+        db_table = 'cupones'
+        managed = False
+        ordering = ['-creado_en']
+        indexes = [
+            models.Index(fields=['codigo']),
+            models.Index(fields=['estado']),
+            models.Index(fields=['is_deleted']),
+        ]

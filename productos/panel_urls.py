@@ -31,6 +31,9 @@ urlpatterns = [
     path("promociones/<int:pk>/editar/", views.promociones_edit, name="promociones_edit"),
     path("promociones/<int:pk>/toggle/", views.promociones_toggle, name="promociones_toggle"),
     path("promociones/<int:pk>/eliminar/", views.promociones_delete, name="promociones_delete"),
+    # Cupones
+    path("cupones/", views.cupones_list, name="cupones"),
+    path("cupones/<int:pk>/eliminar/", views.cupones_delete, name="cupones_delete"),
     # Area para empleados (limitada)
     path("empleados/area/", views_emp.empleado_dashboard, name="empleado_area_dashboard"),
     path("empleados/area/inventario/", views_emp.empleado_inventario, name="empleado_area_inventario"),

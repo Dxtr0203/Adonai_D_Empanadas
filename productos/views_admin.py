@@ -507,3 +507,118 @@ def empleado_delete(request, pk):
         messages.success(request, f'Empleado «{nombre}» eliminado.')
         return redirect('panel:empleado_list')
     return render(request, 'panel/confirm_delete.html', {'obj': empleado, 'tipo': 'Empleado'})
+
+
+# --------- Cupones ---------
+import string
+import random
+
+def generar_codigo_cupon():
+    """Genera un código aleatorio de 6 caracteres con letras y números."""
+    caracteres = string.ascii_uppercase + string.digits
+    codigo = ''.join(random.choice(caracteres) for _ in range(6))
+    return codigo
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def cupones_list(request):
+    """Lista todos los cupones creados con opción de crear nuevos."""
+    from .models import Cupon
+    from decimal import Decimal
+    
+    if request.method == 'POST':
+        producto_id = request.POST.get('producto_id')
+        porcentaje = request.POST.get('porcentaje_descuento')
+        
+        # Validaciones
+        if not producto_id or not porcentaje:
+            messages.error(request, 'Debes seleccionar un producto y un porcentaje.')
+            cupones = Cupon.objects.filter(is_deleted=False).select_related('producto', 'usuario')
+            productos = Producto.objects.filter(estado='activo')
+            return render(request, 'panel/cupones.html', {
+                'cupones': cupones,
+                'productos': productos,
+            })
+        
+        try:
+            porcentaje = int(porcentaje)
+            if porcentaje < 1 or porcentaje > 50:
+                messages.error(request, 'El porcentaje debe estar entre 1 y 50.')
+                cupones = Cupon.objects.filter(is_deleted=False).select_related('producto', 'usuario')
+                productos = Producto.objects.filter(estado='activo')
+                return render(request, 'panel/cupones.html', {
+                    'cupones': cupones,
+                    'productos': productos,
+                })
+        except ValueError:
+            messages.error(request, 'El porcentaje debe ser un número válido.')
+            cupones = Cupon.objects.filter(is_deleted=False).select_related('producto', 'usuario')
+            productos = Producto.objects.filter(estado='activo')
+            return render(request, 'panel/cupones.html', {
+                'cupones': cupones,
+                'productos': productos,
+            })
+        
+        try:
+            producto = Producto.objects.get(pk=producto_id, estado='activo')
+        except Producto.DoesNotExist:
+            messages.error(request, 'El producto seleccionado no existe o no está activo.')
+            cupones = Cupon.objects.filter(is_deleted=False).select_related('producto', 'usuario')
+            productos = Producto.objects.filter(estado='activo')
+            return render(request, 'panel/cupones.html', {
+                'cupones': cupones,
+                'productos': productos,
+            })
+        
+        # Generar código único
+        codigo = generar_codigo_cupon()
+        while Cupon.objects.filter(codigo=codigo).exists():
+            codigo = generar_codigo_cupon()
+        
+        # Calcular precio con descuento
+        precio_original = producto.precio
+        descuento_monto = (precio_original * Decimal(porcentaje)) / Decimal(100)
+        precio_con_descuento = precio_original - descuento_monto
+        
+        # Crear cupón
+        try:
+            cupon = Cupon.objects.create(
+                codigo=codigo,
+                producto=producto,
+                porcentaje_descuento=porcentaje,
+                precio_original=precio_original,
+                precio_con_descuento=precio_con_descuento,
+                estado='Activo'
+            )
+            messages.success(request, f'Cupón «{codigo}» generado exitosamente para {producto.nombre}.')
+        except Exception as e:
+            messages.error(request, f'Error al crear el cupón: {str(e)}')
+        
+        return redirect('panel:cupones')
+    
+    # GET: Mostrar lista de cupones
+    cupones = Cupon.objects.filter(is_deleted=False).select_related('producto', 'usuario')
+    productos = Producto.objects.filter(estado='activo')
+    
+    return render(request, 'panel/cupones.html', {
+        'cupones': cupones,
+        'productos': productos,
+    })
+
+
+@login_required
+@group_required("Admin", "Empleado")
+def cupones_delete(request, pk):
+    """Realizar eliminación lógica de un cupón."""
+    from .models import Cupon
+    cupon = get_object_or_404(Cupon, pk=pk)
+    
+    if request.method == 'POST':
+        codigo = cupon.codigo
+        cupon.is_deleted = True
+        cupon.save()
+        messages.success(request, f'Cupón «{codigo}» eliminado.')
+        return redirect('panel:cupones')
+    
+    return render(request, 'panel/confirm_delete.html', {'obj': cupon, 'tipo': 'Cupón'})
