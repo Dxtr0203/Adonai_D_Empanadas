@@ -5,10 +5,21 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0">Catálogo de Productos</h1>
 
-  <!-- Icono del carrito -->
-  <button id="cart-icon" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#cart-modal">
-    <i class="bi bi-cart"></i> Carrito (<span id="cart-count">0</span>)
-  </button>
+  <!-- Botones Cupón y Carrito -->
+  <div class="d-flex gap-2">
+    {% if request.user.is_authenticated %}
+      <button id="cupon-btn" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#cupon-modal" title="Usar un cupón de descuento">
+        <i class="bi bi-ticket-perforated"></i> Cupón
+      </button>
+    {% else %}
+      <a href="{% url 'usuarios:login' %}?next={% url 'catalogo' %}" class="btn btn-outline-info" title="Inicia sesión para usar cupones">
+        <i class="bi bi-ticket-perforated"></i> Cupón
+      </a>
+    {% endif %}
+    <button id="cart-icon" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#cart-modal">
+      <i class="bi bi-cart"></i> Carrito (<span id="cart-count">0</span>)
+    </button>
+  </div>
 </div>
 
 <!-- Filtro de búsqueda -->
@@ -99,6 +110,78 @@
 
 <!-- Cart modal and cart JS moved to base.html -->
 
+<!-- Modal de Cupones -->
+<div class="modal fade" id="cupon-modal" tabindex="-1" aria-labelledby="cupon-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cupon-modal-label">
+          <i class="bi bi-ticket-perforated"></i> Usar Cupón de Descuento
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Formulario para ingresar código -->
+        <div id="cupon-form-section">
+          <div class="mb-3">
+            <label for="cupon-codigo" class="form-label">Código de Cupón</label>
+            <input type="text" id="cupon-codigo" class="form-control form-control-lg" 
+                   placeholder="Ingresa tu código aquí" maxlength="6" style="text-transform: uppercase;">
+            <small class="form-text text-muted">6 caracteres alfanuméricos</small>
+          </div>
+          <button id="validar-btn" class="btn btn-primary w-100">
+            <i class="bi bi-search"></i> Validar Cupón
+          </button>
+          <div id="cupon-error" class="alert alert-danger mt-3" style="display: none;"></div>
+        </div>
+
+        <!-- Resultado del cupón validado -->
+        <div id="cupon-resultado" style="display: none;">
+          <div class="alert alert-success">
+            <h6>✓ Cupón Válido</h6>
+          </div>
+          
+          <div class="card mb-3">
+            <div class="card-body">
+              <h6 class="card-title" id="resultado-producto">Producto</h6>
+              
+              <div class="row mb-2">
+                <div class="col-6">
+                  <small class="text-muted">Precio Original:</small><br>
+                  <span id="resultado-precio-original" class="h6">Bs 0.00</span>
+                </div>
+                <div class="col-6">
+                  <small class="text-muted">Descuento:</small><br>
+                  <span id="resultado-descuento" class="h6 text-warning">0%</span>
+                </div>
+              </div>
+
+              <hr>
+
+              <div class="row">
+                <div class="col-12">
+                  <small class="text-muted">Precio Final:</small><br>
+                  <span id="resultado-precio-final" class="h5 text-success fw-bold">Bs 0.00</span>
+                </div>
+              </div>
+
+              <small class="text-success mt-2 d-block">
+                <i class="bi bi-check-circle"></i> Ahorras: <strong id="resultado-ahorro">Bs 0.00</strong>
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" id="cupon-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button id="canjear-btn" class="btn btn-success" style="display: none;">
+          <i class="bi bi-check-lg"></i> Canjear Cupón
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   var select = document.getElementById('filter-categoria');
@@ -113,6 +196,205 @@ document.addEventListener('DOMContentLoaded', function() {
         if (f) f.submit();
       }
     });
+  }
+
+  // ===== LÓGICA DE CUPONES =====
+  const codigoInput = document.getElementById('cupon-codigo');
+  const validarBtn = document.getElementById('validar-btn');
+  const canjearBtn = document.getElementById('canjear-btn');
+  const cuponFormSection = document.getElementById('cupon-form-section');
+  const cuponResultado = document.getElementById('cupon-resultado');
+  const cuponError = document.getElementById('cupon-error');
+  
+  let cuponActual = null;
+
+  // Auto-convertir a mayúsculas
+  codigoInput.addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+  });
+
+  // Validar cupón al presionar botón
+  validarBtn.addEventListener('click', function() {
+    const codigo = codigoInput.value.trim();
+    
+    if (!codigo) {
+      cuponError.textContent = 'Por favor ingresa un código de cupón';
+      cuponError.style.display = 'block';
+      return;
+    }
+
+    // Mostrar cargando
+    validarBtn.disabled = true;
+    validarBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Validando...';
+
+    // Hacer petición AJAX
+    fetch('{% url "validar_cupon" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: 'codigo=' + encodeURIComponent(codigo)
+    })
+    .then(response => {
+      if (response.status === 401) {
+        // No autenticado
+        alert('Debes iniciar sesión para usar cupones.');
+        window.location.href = '{% url "usuarios:login" %}?next={% url "catalogo" %}';
+        return;
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (!data) return; // Si fue redirigido
+      
+      validarBtn.disabled = false;
+      validarBtn.innerHTML = '<i class="bi bi-search"></i> Validar Cupón';
+
+      if (data.valido) {
+        cuponActual = data;
+        mostrarResultado(data);
+      } else {
+        cuponError.textContent = data.mensaje || 'Error desconocido';
+        cuponError.style.display = 'block';
+        cuponResultado.style.display = 'none';
+        canjearBtn.style.display = 'none';
+      }
+    })
+    .catch(error => {
+      validarBtn.disabled = false;
+      validarBtn.innerHTML = '<i class="bi bi-search"></i> Validar Cupón';
+      cuponError.textContent = 'Error en la conexión: ' + error;
+      cuponError.style.display = 'block';
+    });
+  });
+
+  function mostrarResultado(data) {
+    cuponError.style.display = 'none';
+    cuponResultado.style.display = 'block';
+    
+    document.getElementById('resultado-producto').textContent = data.producto_nombre;
+    document.getElementById('resultado-precio-original').textContent = 
+      'Bs ' + parseFloat(data.precio_original).toFixed(2);
+    document.getElementById('resultado-descuento').textContent = data.porcentaje_descuento + '%';
+    document.getElementById('resultado-precio-final').textContent = 
+      'Bs ' + parseFloat(data.precio_con_descuento).toFixed(2);
+    
+    // Guardar todos los datos del cupón en cuponActual
+    cuponActual = {
+      cupon_id: data.cupon_id,
+      codigo: data.codigo,
+      producto_id: data.producto_id,
+      producto_nombre: data.producto_nombre,
+      precio_original: data.precio_original,
+      precio_con_descuento: data.precio_con_descuento,
+      porcentaje_descuento: data.porcentaje_descuento
+    };
+    
+    const ahorro = parseFloat(data.precio_original) - parseFloat(data.precio_con_descuento);
+    document.getElementById('resultado-ahorro').textContent = 
+      'Bs ' + ahorro.toFixed(2);
+    
+    canjearBtn.style.display = 'block';
+  }
+
+  // Canjear cupón
+  canjearBtn.addEventListener('click', function() {
+    if (!cuponActual) return;
+
+    canjearBtn.disabled = true;
+    canjearBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Canjeando...';
+
+    fetch('{% url "canjear_cupon" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: 'cupon_id=' + cuponActual.cupon_id
+    })
+    .then(response => {
+      if (response.status === 401) {
+        // No autenticado
+        alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
+        window.location.href = '{% url "usuarios:login" %}?next={% url "catalogo" %}';
+        return;
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (!data) return; // Si fue redirigido
+      
+      canjearBtn.disabled = false;
+      canjearBtn.innerHTML = '<i class="bi bi-check-lg"></i> Canjear Cupón';
+
+      if (data.exito) {
+        // Mostrar mensaje de éxito
+        alert('¡Cupón canjeado exitosamente!\n\nCódigo: ' + data.codigo);
+        
+        // Agregar producto al carrito con cupón y precio de descuento
+        if (cuponActual && cuponActual.producto_id) {
+          addToCart(
+            cuponActual.producto_id,
+            cuponActual.producto_nombre,
+            cuponActual.precio_con_descuento,
+            1,
+            {
+              codigo: cuponActual.codigo,
+              porcentaje: cuponActual.porcentaje_descuento,
+              cupon_id: cuponActual.cupon_id
+            },
+            null
+          );
+          // Mostrar carrito actualizado
+          showCart();
+        }
+        
+        // Resetear modal
+        resetearModal();
+        
+        // Cerrar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('cupon-modal'));
+        if (modal) modal.hide();
+      } else {
+        cuponError.textContent = data.mensaje || 'Error al canjear el cupón';
+        cuponError.style.display = 'block';
+      }
+    })
+    .catch(error => {
+      canjearBtn.disabled = false;
+      canjearBtn.innerHTML = '<i class="bi bi-check-lg"></i> Canjear Cupón';
+      cuponError.textContent = 'Error en la conexión: ' + error;
+      cuponError.style.display = 'block';
+    });
+  });
+
+  function resetearModal() {
+    codigoInput.value = '';
+    cuponError.style.display = 'none';
+    cuponFormSection.style.display = 'block';
+    cuponResultado.style.display = 'none';
+    canjearBtn.style.display = 'none';
+    cuponActual = null;
+  }
+
+  // Resetear modal al cerrar
+  document.getElementById('cupon-modal').addEventListener('hidden.bs.modal', resetearModal);
+
+  // Función auxiliar para obtener CSRF token
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
   }
 });
 </script>

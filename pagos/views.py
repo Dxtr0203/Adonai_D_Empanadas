@@ -10,6 +10,7 @@ import pytz
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import Payment
+from productos.models import Producto, Inventario
 
 # Intentar importar reportlab
 try:
@@ -18,6 +19,94 @@ try:
     REPORTLAB_AVAILABLE = True
 except Exception:
     REPORTLAB_AVAILABLE = False
+
+
+def process_payment_stock(session_id, data_object):
+    """
+    Procesa la actualización de stock cuando un pago se completa exitosamente.
+    Reduce el stock de los productos en la compra y registra el movimiento en Inventario.
+    Se ejecuta desde el webhook de Stripe.
+    """
+    stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+    
+    print(f"[WEBHOOK STOCK] Iniciando procesamiento de stock para session: {session_id}")
+    
+    try:
+        # Obtener la sesión de Stripe
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+        
+        # Obtener los items del carrito desde los metadatos
+        cart_items = []
+        if stripe_session.get('metadata', {}).get('cart_items'):
+            try:
+                cart_items = json.loads(stripe_session['metadata']['cart_items'])
+                print(f"[WEBHOOK STOCK] Items encontrados en metadatos: {len(cart_items)} items")
+            except Exception as e:
+                print(f"[WEBHOOK STOCK] Error parseando metadatos: {e}")
+        
+        # Si no hay metadatos, intentar procesar desde los line items
+        if not cart_items:
+            print("[WEBHOOK STOCK] Intentando obtener items desde Stripe")
+            try:
+                li = stripe.checkout.Session.list_line_items(session_id)
+                for item in li.data:
+                    cart_items.append({
+                        'id': getattr(item, 'id', None),
+                        'quantity': getattr(item, 'quantity', 1),
+                        'nombre': item.description or 'Producto desconocido'
+                    })
+                print(f"[WEBHOOK STOCK] Items obtenidos desde Stripe: {len(cart_items)} items")
+            except Exception as e:
+                print(f"[WEBHOOK STOCK] Error obteniendo items: {e}")
+        
+        if not cart_items:
+            print(f"[WEBHOOK STOCK] No hay items para procesar")
+            return
+        
+        # Procesar cada item: reducir stock y registrar en Inventario
+        for item in cart_items:
+            try:
+                product_id = item.get('id')
+                quantity = item.get('cantidad') or item.get('quantity', 1)
+                product_name = item.get('nombre') or item.get('name')
+                
+                print(f"[WEBHOOK STOCK] Procesando: ID={product_id}, Nombre={product_name}, Cantidad={quantity}")
+                
+                # Si no tenemos ID del producto, intentar encontrarlo por nombre
+                if not product_id:
+                    producto = Producto.objects.filter(nombre__icontains=product_name).first()
+                else:
+                    producto = Producto.objects.get(id=product_id)
+                
+                if producto:
+                    stock_anterior = producto.stock_actual
+                    # Reducir el stock actual
+                    producto.stock_actual = max(0, producto.stock_actual - quantity)
+                    producto.save(update_fields=['stock_actual'])
+                    
+                    print(f"[WEBHOOK STOCK] {producto.nombre}: {stock_anterior} -> {producto.stock_actual}")
+                    
+                    # Registrar el movimiento en Inventario
+                    Inventario.objects.create(
+                        producto=producto,
+                        cantidad=quantity,
+                        tipo_movimiento='Salida',
+                        observacion='Venta por compra online - Stripe (Webhook)',
+                        referencia=session_id,
+                        usuario=None  # Sistema automático
+                    )
+                    print(f"[WEBHOOK STOCK] Inventario registrado para {producto.nombre}")
+                else:
+                    print(f"[WEBHOOK STOCK] Producto no encontrado: ID={product_id}, Nombre={product_name}")
+            except Producto.DoesNotExist:
+                print(f"[WEBHOOK STOCK] Producto con ID {product_id} no existe")
+            except Exception as e:
+                print(f"[WEBHOOK STOCK] Error procesando item: {e}")
+                pass
+    
+    except Exception as e:
+        print(f"[WEBHOOK STOCK] Error en process_payment_stock: {e}")
+        pass
 
 
 def checkout_view(request):
@@ -42,6 +131,14 @@ def create_checkout_session(request):
         payload = {}
 
     amount_bob = payload.get('amount_bob')
+    cart_items = payload.get('cart_items', [])
+    
+    print(f"[CREATE SESSION] Creando sesión de checkout")
+    print(f"[CREATE SESSION] Monto: {amount_bob} BOB")
+    print(f"[CREATE SESSION] Items en carrito: {len(cart_items)}")
+    if cart_items:
+        print(f"[CREATE SESSION] Primer item: {cart_items[0]}")
+    
     try:
         amount_bob = Decimal(str(amount_bob)) if amount_bob is not None else None
     except (ValueError, TypeError):
@@ -58,6 +155,11 @@ def create_checkout_session(request):
 
     try:
         success_url = domain + '/pago/exito/?session_id={CHECKOUT_SESSION_ID}'
+        
+        # Serializar los items para guardar en metadatos
+        cart_items_json = json.dumps(cart_items)
+        print(f"[CREATE SESSION] JSON a enviar: {cart_items_json[:200]}...")
+        
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -71,7 +173,12 @@ def create_checkout_session(request):
             mode='payment',
             success_url=success_url,
             cancel_url=domain + '/pago/error/',
+            metadata={
+                'cart_items': cart_items_json
+            }
         )
+
+        print(f"[CREATE SESSION] Sesión creada: {session.id}")
 
         try:
             Payment.objects.create(
@@ -80,16 +187,96 @@ def create_checkout_session(request):
                 currency='bob',  # Usar BOB directamente
                 status='created'
             )
-        except Exception:
+        except Exception as e:
+            print(f"[CREATE SESSION] Error creando Payment: {e}")
             pass
 
         return JsonResponse({'id': session.id})
     except Exception as e:
+        print(f"[CREATE SESSION] Error creando sesión Stripe: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def process_payment_stock_from_session(session_id):
+    """
+    Procesa la actualización de stock desde un session_id de Stripe.
+    Se ejecuta cuando el usuario llega a la página de éxito.
+    """
+    stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+    
+    try:
+        # Obtener la sesión de Stripe
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+        
+        # Obtener los items del carrito desde los metadatos
+        cart_items = []
+        if stripe_session.get('metadata', {}).get('cart_items'):
+            try:
+                cart_items = json.loads(stripe_session['metadata']['cart_items'])
+                print(f"[STOCK] Items encontrados en metadatos: {len(cart_items)} items")
+            except Exception as e:
+                print(f"[STOCK] Error parseando metadatos: {e}")
+        
+        if not cart_items:
+            print(f"[STOCK] No hay items en metadatos para session {session_id}")
+            return
+        
+        # Procesar cada item: reducir stock y registrar en Inventario
+        for item in cart_items:
+            try:
+                product_id = item.get('id')
+                quantity = item.get('cantidad') or item.get('quantity', 1)
+                product_name = item.get('nombre') or item.get('name')
+                
+                print(f"[STOCK] Procesando: ID={product_id}, Nombre={product_name}, Cantidad={quantity}")
+                
+                if not product_id:
+                    print(f"[STOCK] Sin ID, buscando por nombre: {product_name}")
+                    producto = Producto.objects.filter(nombre__icontains=product_name).first()
+                else:
+                    producto = Producto.objects.get(id=product_id)
+                
+                if producto:
+                    # Stock anterior
+                    stock_anterior = producto.stock_actual
+                    
+                    # Reducir el stock actual
+                    producto.stock_actual = max(0, producto.stock_actual - quantity)
+                    producto.save(update_fields=['stock_actual'])
+                    
+                    print(f"[STOCK] {producto.nombre}: {stock_anterior} -> {producto.stock_actual}")
+                    
+                    # Registrar el movimiento en Inventario
+                    Inventario.objects.create(
+                        producto=producto,
+                        cantidad=quantity,
+                        tipo_movimiento='Salida',
+                        observacion='Venta por compra online - Stripe (Session: {})'.format(session_id),
+                        referencia=session_id,
+                        usuario=None  # Sistema automático
+                    )
+                    print(f"[STOCK] Inventario registrado para {producto.nombre}")
+                else:
+                    print(f"[STOCK] Producto no encontrado: ID={product_id}, Nombre={product_name}")
+            except Producto.DoesNotExist:
+                print(f"[STOCK] Producto con ID {product_id} no existe")
+            except Exception as e:
+                print(f"[STOCK] Error procesando item: {e}")
+                pass
+    
+    except Exception as e:
+        print(f"[STOCK] Error en process_payment_stock_from_session: {e}")
+        pass
 
 
 def pago_exito(request):
     session_id = request.GET.get('session_id')
+    
+    # Procesar el stock cuando el usuario llega a la página de éxito
+    if session_id:
+        print(f"[EXITO] Procesando pago exitoso para session: {session_id}")
+        process_payment_stock_from_session(session_id)
+    
     return render(request, 'pagos/exito.html', {'session_id': session_id})
 
 
@@ -125,6 +312,9 @@ def stripe_webhook(request):
                 p.status = 'paid'
                 p.raw_event = json.dumps(event)
                 p.save()
+                
+                # Procesar la actualización de stock después del pago
+                process_payment_stock(session_id, data_object)
             except Payment.DoesNotExist:
                 try:
                     Payment.objects.create(
@@ -134,6 +324,8 @@ def stripe_webhook(request):
                         status='paid',
                         raw_event=json.dumps(event)
                     )
+                    # Procesar la actualización de stock
+                    process_payment_stock(session_id, data_object)
                 except Exception:
                     pass
 
