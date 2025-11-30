@@ -112,30 +112,139 @@
 </div>
 
 <!-- Sección Historial de Compras -->
-{% if user.is_authenticated and historial_compras %}
+{% if user.is_authenticated %}
 <div class="container py-5">
-  <h2 class="h4">Historial de Compras</h2>
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Monto</th>
-        <th>Estado</th>
-        <th>Método de Pago</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for compra in historial_compras %}
-      <tr>
-        <td>{{ compra.created_at|date:"d/m/Y H:i" }}</td>
-        <td>{{ compra.amount_cents|floatformat:2 }} USD</td>
-        <td>{{ compra.get_status_display }}</td>
-        <td>{{ compra.currency|title }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <h2 class="h4 mb-4"><i class="bi bi-clock-history"></i> Historial de Compras</h2>
+  
+  {% if historial_compras %}
+    <div class="table-responsive">
+      <table class="table table-striped table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th scope="col">N°#</th>
+            <th scope="col">Cantidad Total</th>
+            <th scope="col">Monto (Bs.)</th>
+            <th scope="col">Método de Pago</th>
+            <th scope="col">Fecha y Hora</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for compra in historial_compras %}
+          <tr>
+            <td>
+              <strong>COMPRA #{{ compra.numero_compra }}</strong>
+            </td>
+            <td class="text-center">
+              <span class="badge bg-secondary">{{ compra.cantidad_total }} item{{ compra.cantidad_total|pluralize }}</span>
+            </td>
+            <td>
+              <strong>Bs. {{ compra.monto_total|floatformat:2 }}</strong>
+            </td>
+            <td>
+              <span class="badge bg-info text-dark">{{ compra.metodo_pago|upper }}</span>
+            </td>
+            <td>
+              {{ compra.creado_en|date:"d/m/Y H:i" }}
+            </td>
+            <td>
+              <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalDetalle{{ compra.venta_id }}">
+                <i class="bi bi-eye"></i> DETALLE
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert alert-info mt-3">
+      <small><strong>Total de compras registradas:</strong> {{ historial_compras|length }}</small>
+    </div>
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>Sin compras aún.</strong> Cuando realices tu primera compra, aparecerá aquí tu historial de compras.
+    </div>
+  {% endif %}
 </div>
+
+<!-- Modales de Detalle para cada compra -->
+{% for compra in historial_compras %}
+<div class="modal fade" id="modalDetalle{{ compra.venta_id }}" tabindex="-1" aria-labelledby="modalDetalle{{ compra.venta_id }}Label" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalDetalle{{ compra.venta_id }}Label">
+          <i class="bi bi-bag"></i> Detalles de COMPRA #{{ compra.numero_compra }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <p><strong>Fecha:</strong> {{ compra.creado_en|date:"d/m/Y H:i" }}</p>
+            <p><strong>Método de Pago:</strong> <span class="badge bg-info text-dark">{{ compra.metodo_pago|upper }}</span></p>
+          </div>
+          <div class="col-md-6">
+            <p><strong>Estado:</strong> 
+              {% if compra.estado == 'pagado' %}
+                <span class="badge bg-success">Pagado</span>
+              {% else %}
+                <span class="badge bg-warning">{{ compra.estado|title }}</span>
+              {% endif %}
+            </p>
+            <p><strong>Total:</strong> <span class="text-success fs-5">Bs. {{ compra.monto_total|floatformat:2 }}</span></p>
+          </div>
+        </div>
+
+        <hr>
+
+        <h6 class="mb-3"><i class="bi bi-cart-check"></i> Productos Comprados:</h6>
+        
+        {% if compra.detalles %}
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Producto</th>
+                  <th class="text-center" style="width: 80px;">Cantidad</th>
+                  <th class="text-end" style="width: 100px;">Precio Unit.</th>
+                  <th class="text-end" style="width: 100px;">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for detalle in compra.detalles %}
+                <tr>
+                  <td>{{ detalle.producto }}</td>
+                  <td class="text-center">{{ detalle.cantidad }}</td>
+                  <td class="text-end">Bs. {{ detalle.precio_unitario|floatformat:2 }}</td>
+                  <td class="text-end"><strong>Bs. {{ detalle.subtotal|floatformat:2 }}</strong></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="table-info">
+                  <th colspan="3" class="text-end">TOTAL:</th>
+                  <th class="text-end"><strong>Bs. {{ compra.monto_total|floatformat:2 }}</strong></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Detalles no disponibles.</strong> Los productos de esta compra aún se están procesando. Por favor, intenta más tarde.
+          </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
 {% endif %}
 
 <!-- 🎨 Estilos -->

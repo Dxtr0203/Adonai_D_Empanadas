@@ -1,0 +1,200 @@
+<!-- Modal para cambiar contraseña -->
+<div class="modal fade" id="cambiarContrasenaModal" tabindex="-1" aria-labelledby="cambiarContrasenaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cambiarContrasenaLabel">Cambiar contraseña</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCambiarContrasena" method="post" action="{% url 'usuarios:cambiar_contrasena' %}" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- Mensajes de error/éxito -->
+                    <div id="mensajeModal" class="alert d-none" role="alert"></div>
+                    
+                    <!-- Contraseña actual -->
+                    <div class="mb-3" id="field_old_password">
+                        <label for="id_old_password" class="form-label">Contraseña actual</label>
+                        <input type="password" class="form-control" id="id_old_password" name="old_password" 
+                               placeholder="Ingresa tu contraseña actual" required autocomplete="current-password">
+                        <div class="invalid-feedback d-block text-danger small mt-1" id="error_old_password"></div>
+                    </div>
+                    
+                    <!-- Contraseña nueva -->
+                    <div class="mb-3" id="field_new_password">
+                        <label for="id_new_password" class="form-label">Contraseña nueva</label>
+                        <input type="password" class="form-control" id="id_new_password" name="new_password" 
+                               placeholder="Ingresa tu nueva contraseña" required autocomplete="new-password">
+                        <div class="invalid-feedback d-block text-danger small mt-1" id="error_new_password"></div>
+                    </div>
+                    
+                    <!-- Confirmar contraseña -->
+                    <div class="mb-3" id="field_confirm_password">
+                        <label for="id_confirm_password" class="form-label">Confirmar contraseña</label>
+                        <input type="password" class="form-control" id="id_confirm_password" name="confirm_password" 
+                               placeholder="Confirma tu nueva contraseña" required autocomplete="new-password">
+                        <div class="invalid-feedback d-block text-danger small mt-1" id="error_confirm_password"></div>
+                    </div>
+
+                    <!-- Mensaje de éxito (oculto inicialmente) -->
+                    <div id="successMessage" class="text-center d-none">
+                        <div class="mb-3">
+                            <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4 class="text-success mb-2">✓ CONTRASEÑA CAMBIADA EXITOSAMENTE</h4>
+                        <p class="text-muted">Serás redirigido al inicio en unos momentos...</p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarContrasena">Cambiar contraseña</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formCambiarContrasena = document.getElementById('formCambiarContrasena');
+    const btnGuardarContrasena = document.getElementById('btnGuardarContrasena');
+    const mensajeModal = document.getElementById('mensajeModal');
+    const modalElement = document.getElementById('cambiarContrasenaModal');
+    
+    // Limpiar mensajes cuando se abre el modal
+    modalElement.addEventListener('show.bs.modal', function() {
+        limpiarFormulario();
+    });
+    
+    function limpiarFormulario() {
+        mensajeModal.classList.add('d-none');
+        mensajeModal.innerHTML = '';
+        mensajeModal.classList.remove('alert-success', 'alert-danger');
+        formCambiarContrasena.reset();
+        // Limpiar errores
+        document.querySelectorAll('[id^="error_"]').forEach(el => el.textContent = '');
+        // Remover clases de validación
+        formCambiarContrasena.querySelectorAll('.form-control').forEach(el => {
+            el.classList.remove('is-invalid');
+        });
+    }
+    
+    function mostrarError(fieldName, errorMessage) {
+        const errorEl = document.getElementById(`error_${fieldName}`);
+        const inputEl = document.getElementById(`id_${fieldName}`);
+        if (errorEl) {
+            errorEl.textContent = errorMessage;
+        }
+        if (inputEl) {
+            inputEl.classList.add('is-invalid');
+        }
+    }
+    
+    function limpiarErrores() {
+        document.querySelectorAll('[id^="error_"]').forEach(el => el.textContent = '');
+        formCambiarContrasena.querySelectorAll('.form-control').forEach(el => {
+            el.classList.remove('is-invalid');
+        });
+    }
+    
+    // Enviar formulario al hacer clic en el botón
+    btnGuardarContrasena.addEventListener('click', function() {
+        limpiarErrores();
+        
+        // Validar que los campos no estén vacíos
+        const oldPassword = document.getElementById('id_old_password').value.trim();
+        const newPassword = document.getElementById('id_new_password').value.trim();
+        const confirmPassword = document.getElementById('id_confirm_password').value.trim();
+        
+        let hasErrors = false;
+        
+        if (!oldPassword) {
+            mostrarError('old_password', 'Este campo es obligatorio.');
+            hasErrors = true;
+        }
+        if (!newPassword) {
+            mostrarError('new_password', 'Este campo es obligatorio.');
+            hasErrors = true;
+        }
+        if (!confirmPassword) {
+            mostrarError('confirm_password', 'Este campo es obligatorio.');
+            hasErrors = true;
+        }
+        
+        if (newPassword && confirmPassword && newPassword !== confirmPassword) {
+            mostrarError('confirm_password', 'Las contraseñas nuevas no coinciden.');
+            hasErrors = true;
+        }
+        
+        if (hasErrors) {
+            return;
+        }
+        
+        // Enviar formulario vía AJAX
+        const formData = new FormData(formCambiarContrasena);
+        
+        // Deshabilitar botón mientras se procesa
+        btnGuardarContrasena.disabled = true;
+        btnGuardarContrasena.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        
+        fetch('{% url "usuarios:cambiar_contrasena" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                // ÉXITO - Ocultar formulario y mostrar mensaje
+                document.getElementById('formCambiarContrasena').style.display = 'none';
+                document.getElementById('modalFooter').style.display = 'none';
+                document.getElementById('successMessage').classList.remove('d-none');
+                
+                // Redirigir al inicio después de 3 segundos
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 3000);
+            } else {
+                // ERROR - Mostrar mensaje genérico
+                mensajeModal.classList.remove('d-none', 'alert-success');
+                mensajeModal.classList.add('alert-danger');
+                
+                // Intenta obtener el mensaje de error del servidor
+                response.text().then(html => {
+                    // Buscar si hay un mensaje de error simple
+                    if (html.includes('incorrecta')) {
+                        mensajeModal.innerHTML = '<strong>✗ Error:</strong> La contraseña actual es incorrecta.';
+                        mostrarError('old_password', 'La contraseña actual es incorrecta.');
+                    } else if (html.includes('coinciden')) {
+                        mensajeModal.innerHTML = '<strong>✗ Error:</strong> Las contraseñas nuevas no coinciden.';
+                        mostrarError('confirm_password', 'Las contraseñas nuevas no coinciden.');
+                    } else {
+                        mensajeModal.innerHTML = '<strong>✗ Error:</strong> No se pudo cambiar la contraseña. Intenta nuevamente.';
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            mensajeModal.classList.remove('d-none', 'alert-success');
+            mensajeModal.classList.add('alert-danger');
+            mensajeModal.innerHTML = '<strong>✗ Error:</strong> Error al procesar tu solicitud. Intenta nuevamente.';
+        })
+        .finally(() => {
+            // Reactivar botón
+            btnGuardarContrasena.disabled = false;
+            btnGuardarContrasena.innerHTML = 'Cambiar contraseña';
+        });
+    });
+    
+    // Permitir envío con Enter en el último campo
+    document.getElementById('id_confirm_password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            btnGuardarContrasena.click();
+        }
+    });
+});
+</script>

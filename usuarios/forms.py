@@ -106,3 +106,47 @@ class PasswordChangeForm(forms.Form):
         if new_password and confirm_password and new_password != confirm_password:
             self.add_error('confirm_password', "Las contraseñas no coinciden.")
         return cleaned_data
+
+
+# -------------------------
+# FORMULARIO DE CAMBIO DE CONTRASEÑA (CLIENTE)
+# -------------------------
+class ClientePasswordChangeForm(forms.Form):
+    """Formulario para que clientes cambien su contraseña desde el perfil."""
+    old_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ingresa tu contraseña actual',
+            'autocomplete': 'current-password'
+        }),
+        label="Contraseña actual",
+        required=True
+    )
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ingresa tu nueva contraseña',
+            'autocomplete': 'new-password'
+        }),
+        label="Contraseña nueva",
+        required=True
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirma tu nueva contraseña',
+            'autocomplete': 'new-password'
+        }),
+        label="Confirmar contraseña",
+        required=True
+    )
+
+    def clean(self):
+        """Verifica que las contraseñas nuevas coincidan."""
+        cleaned_data = super().clean()
+        new_password = cleaned_data.get('new_password')
+        confirm_password = cleaned_data.get('confirm_password')
+
+        if new_password and confirm_password and new_password != confirm_password:
+            self.add_error('confirm_password', "Las contraseñas no coinciden.")
+        return cleaned_data

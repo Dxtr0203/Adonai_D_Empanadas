@@ -12,9 +12,10 @@ from django.conf import settings
 from django.urls import reverse_lazy
 from django import forms
 from django.contrib.auth.hashers import make_password
+from django.http import JsonResponse
 
 from .models import Usuario
-from .forms import UsuarioForm, PasswordChangeForm
+from .forms import UsuarioForm, PasswordChangeForm, ClientePasswordChangeForm
 
 
 # ======================
@@ -200,6 +201,56 @@ def force_password_change(request):
         form = PasswordChangeForm()
 
     return render(request, 'usuarios/force_password_change.html', {'form': form})
+
+
+# ======================
+# CAMBIAR CONTRASEÑA (CLIENTE)
+# ======================
+@login_required
+def cambiar_contrasena_cliente(request):
+    """Vista AJAX para que el cliente cambie su contraseña desde el perfil."""
+    if request.method == 'POST':
+        form = ClientePasswordChangeForm(request.POST)
+        if form.is_valid():
+            user = request.user
+            old_password = form.cleaned_data['old_password']
+            
+            # Verificar que la contraseña antigua es correcta
+            if not user.check_password(old_password):
+                return render(request, 'usuarios/modal_cambiar_contrasena.html', 
+                            {'form': form, 'error': 'La contraseña actual es incorrecta.'}, 
+                            status=400)
+            
+            # Cambiar la contraseña
+            new_password = form.cleaned_data['new_password']
+            
+            # 1. Actualizar en auth.User
+            user.set_password(new_password)
+            user.save()
+            
+            # 2. Actualizar en tabla usuarios (custom)
+            try:
+                usuario_custom = Usuario.objects.get(email__iexact=user.email)
+                # Usar el mismo hash que Django genera para sincronizar
+                usuario_custom.password = user.password  # Usar el hash generado por set_password
+                usuario_custom.actualizado_en = timezone.now()
+                usuario_custom.save(update_fields=['password', 'actualizado_en'])
+            except Usuario.DoesNotExist:
+                pass
+            
+            # 3. Actualizar sesión para no desconectar al usuario
+            update_session_auth_hash(request, user)
+            
+            # Retornar respuesta exitosa
+            return render(request, 'usuarios/modal_cambiar_contrasena.html', 
+                        {'form': ClientePasswordChangeForm(), 'success': 'Contraseña actualizada correctamente.'})
+        else:
+            return render(request, 'usuarios/modal_cambiar_contrasena.html', 
+                        {'form': form}, status=400)
+    else:
+        form = ClientePasswordChangeForm()
+    
+    return render(request, 'usuarios/modal_cambiar_contrasena.html', {'form': form})
 
 
 # ======================

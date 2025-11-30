@@ -30,12 +30,21 @@
                     {% endfor %}
                 </div>
 
-                <div class="mt-4 d-flex gap-2">
+                <div class="mt-4 d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                    <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#cambiarContrasenaModal">
+                        Cambiar contraseña
+                    </button>
                     <a href="{% url 'inicio' %}" class="btn btn-outline-secondary">Cancelar</a>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Incluir el modal de cambiar contraseña -->
+{% include 'usuarios/modal_cambiar_contrasena.html' %}
+
+<!-- Bootstrap JS (asegúrate de que esté cargado) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}

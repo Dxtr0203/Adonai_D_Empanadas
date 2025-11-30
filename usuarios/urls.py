@@ -14,6 +14,9 @@ urlpatterns = [
     # Ruta para el perfil del usuario
     path("perfil/", views.perfil, name="perfil"),
 
+    # Ruta para cambiar contraseña desde el perfil (cliente)
+    path("cambiar-contrasena/", views.cambiar_contrasena_cliente, name="cambiar_contrasena"),
+
     # Ruta para registro de nuevos usuarios
     path("register/", views.register, name="register"),
 

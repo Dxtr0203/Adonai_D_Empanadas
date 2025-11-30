@@ -17,5 +17,9 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     raw_event = models.TextField(blank=True, null=True)
 
+    class Meta:
+        db_table = 'pagos_payment'
+        managed = False
+
     def __str__(self):
         return f"Payment {self.stripe_session_id} ({self.get_status_display()})"

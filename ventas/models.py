@@ -20,14 +20,18 @@ class Venta(models.Model):
     codigo_postal = models.CharField(max_length=20, blank=True, null=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'ventas_venta'
+        managed = False
 
 class VentaDetalle(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE)
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
     cantidad = models.IntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, db_column='subtotal')
 
-    def save(self, *args, **kwargs):
-        self.subtotal = self.cantidad * self.precio_unitario
-        super().save(*args, **kwargs)
+    class Meta:
+        db_table = 'ventas_ventadetalle'
+        managed = False
