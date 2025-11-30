@@ -170,3 +170,128 @@ def mark_notification_read(request):
     unread_count = Notification.objects.exclude(id__in=NotificationRead.objects.filter(user=user).values_list('notification_id', flat=True)).count()
 
     return JsonResponse({'ok': True, 'count': unread_count})
+
+
+# --------- Cupones (Cliente) ---------
+@login_required
+def validar_cupon(request):
+    """
+    Valida un código de cupón y retorna la información del descuento.
+    Endpoint AJAX que se llama al ingresar un código en el modal de cupones.
+    """
+    from .models import Cupon
+    from django.utils import timezone
+    
+    if request.method == 'POST':
+        codigo = request.POST.get('codigo', '').strip().upper()
+        
+        if not codigo:
+            return JsonResponse({'valido': False, 'mensaje': 'Ingresa un código de cupón'})
+        
+        try:
+            # Buscar cupón que esté activo y no eliminado
+            cupon = Cupon.objects.get(
+                codigo=codigo,
+                estado='Activo',
+                is_deleted=False
+            )
+            
+            # Retornar información del cupón
+            return JsonResponse({
+                'valido': True,
+                'codigo': cupon.codigo,
+                'producto_id': cupon.producto.id,
+                'producto_nombre': cupon.producto.nombre,
+                'porcentaje_descuento': cupon.porcentaje_descuento,
+                'precio_original': float(cupon.precio_original),
+                'precio_con_descuento': float(cupon.precio_con_descuento),
+                'cupon_id': cupon.id
+            })
+        except Cupon.DoesNotExist:
+            return JsonResponse({
+                'valido': False,
+                'mensaje': 'CODIGO INCORRECTO'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'valido': False,
+                'mensaje': f'Error: {str(e)}'
+            })
+    
+    return JsonResponse({'valido': False, 'mensaje': 'Método no permitido'})
+
+
+@login_required
+def canjear_cupon(request):
+    """
+    Canjea un cupón: registra el uso, asigna el usuario y actualiza el estado.
+    """
+    from .models import Cupon
+    from django.utils import timezone
+    
+    if request.method == 'POST':
+        cupon_id = request.POST.get('cupon_id')
+        
+        try:
+            cupon = Cupon.objects.get(id=cupon_id, estado='Activo', is_deleted=False)
+            
+            # Actualizar el cupón
+            cupon.estado = 'Desactivado'
+            cupon.fecha_uso = timezone.now()
+            
+            # Obtener usuario (usuario autenticado)
+            try:
+                from usuarios.models import Usuario
+                usuario = Usuario.objects.get(email=request.user.email)
+                cupon.usuario = usuario
+            except:
+                # Si no existe en usuarios.Usuario, solo dejar el email
+                pass
+            
+            cupon.save()
+            
+            return JsonResponse({
+                'exito': True,
+                'mensaje': 'Cupón canjeado exitosamente',
+                'codigo': cupon.codigo
+            })
+        
+        except Cupon.DoesNotExist:
+            return JsonResponse({
+                'exito': False,
+                'mensaje': 'El cupón no es válido o ya fue utilizado'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'exito': False,
+                'mensaje': f'Error al canjear el cupón: {str(e)}'
+            })
+    
+    return JsonResponse({'exito': False, 'mensaje': 'Método no permitido'})
+
+
+def get_product_stock(request, product_id):
+    """
+    Endpoint AJAX que devuelve el stock actual de un producto.
+    Útil para actualizar el inventario en tiempo real en el catálogo.
+    """
+    try:
+        producto = Producto.objects.get(id=product_id)
+        return JsonResponse({
+            'exito': True,
+            'producto_id': producto.id,
+            'nombre': producto.nombre,
+            'stock_actual': producto.stock_actual,
+            'stock_minimo': producto.stock_minimo,
+            'estado': 'agotado' if producto.stock_actual <= 0 else 'disponible'
+        })
+    except Producto.DoesNotExist:
+        return JsonResponse({
+            'exito': False,
+            'mensaje': 'Producto no encontrado'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'exito': False,
+            'mensaje': f'Error: {str(e)}'
+        }, status=500)

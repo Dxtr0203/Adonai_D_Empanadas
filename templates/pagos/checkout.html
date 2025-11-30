@@ -71,14 +71,28 @@
       })();
 
       document.getElementById('checkout-button').addEventListener('click', function () {
+        const cart = JSON.parse(localStorage.getItem('cart')) || [];
         const amountBob = computeCartTotalBob();
+        
+        // Preparar los items del carrito con el formato correcto
+        const cartItems = cart.map(item => ({
+          id: item.id,
+          nombre: item.nombre,
+          precio: item.precio,
+          cantidad: item.cantidad,
+          cupon: item.cupon || null
+        }));
+        
         fetch('{% url "pagos:create_checkout_session" %}', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
           },
-          body: JSON.stringify({ amount_bob: amountBob })
+          body: JSON.stringify({ 
+            amount_bob: amountBob,
+            cart_items: cartItems
+          })
         })
         .then(res => res.json())
         .then(data => {
