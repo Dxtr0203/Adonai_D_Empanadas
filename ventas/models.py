@@ -11,7 +11,7 @@ class Venta(models.Model):
         ('entregado','entregado'),
         ('cancelado','cancelado')
     )
-    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)
+    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, null=True, blank=True)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     metodo_pago = models.CharField(max_length=20, choices=(('Efectivo','Efectivo'),('Tarjeta','Tarjeta'),('Transferencia','Transferencia'),('Otro','Otro')))
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')

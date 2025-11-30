@@ -141,6 +141,38 @@ def dashboard(request):
         .order_by('-total_vendido')[:5]
     )
     
+    # ===== HISTORIAL DE VENTAS DEL DÍA =====
+    # Ventas de hoy
+    dt_hoy_inicio = timezone.make_aware(datetime.combine(hoy, datetime.min.time()))
+    dt_hoy_fin = timezone.make_aware(datetime.combine(hoy, datetime.max.time()))
+    
+    ventas_hoy = Venta.objects.filter(
+        creado_en__gte=dt_hoy_inicio, 
+        creado_en__lte=dt_hoy_fin
+    ).select_related('usuario').prefetch_related('ventadetalle_set__producto').order_by('-creado_en')
+    
+    # Convertir a lista con detalles de detalles
+    historial_ventas = []
+    for venta in ventas_hoy:
+        detalles = []
+        for detalle in venta.ventadetalle_set.all():
+            detalles.append({
+                'producto': detalle.producto.nombre,
+                'cantidad': detalle.cantidad,
+                'precio': float(detalle.precio_unitario),
+                'subtotal': float(detalle.subtotal)
+            })
+        historial_ventas.append({
+            'id': venta.id,
+            'cliente': venta.usuario.nombre if venta.usuario else 'Cliente Anónimo',
+            'email': venta.usuario.email if venta.usuario else '',
+            'hora': venta.creado_en.strftime('%H:%M:%S'),
+            'metodo_pago': venta.metodo_pago,
+            'estado': venta.estado,
+            'total': float(venta.total),
+            'detalles': detalles
+        })
+    
     return render(request, "panel/dashboard.html", {
         # Filtros
         "fecha_inicio": fecha_inicio.isoformat(),
@@ -171,6 +203,10 @@ def dashboard(request):
         
         # Rentabilidad
         "rentabilidad_categoria": rentabilidad_categoria,
+        
+        # Historial de ventas del día
+        "historial_ventas": historial_ventas,
+        "total_ventas_hoy": len(historial_ventas),
     })
 
 

@@ -11,6 +11,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from .models import Payment
 from productos.models import Producto, Inventario
+from ventas.models import Venta, VentaDetalle
 
 # Intentar importar reportlab
 try:
@@ -19,6 +20,115 @@ try:
     REPORTLAB_AVAILABLE = True
 except Exception:
     REPORTLAB_AVAILABLE = False
+
+
+def create_venta_from_stripe_session(session_id, amount_bob):
+    """
+    Crea un registro de Venta y VentaDetalle a partir de una sesión de Stripe completada.
+    Se ejecuta cuando el pago es exitoso para registrar la transacción en el dashboard.
+    """
+    stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+    
+    print(f"[CREATE VENTA] Iniciando creación de venta para session: {session_id}")
+    
+    try:
+        # Obtener la sesión de Stripe
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+        
+        # Obtener los items del carrito desde los metadatos
+        cart_items = []
+        if stripe_session.get('metadata', {}).get('cart_items'):
+            try:
+                cart_items = json.loads(stripe_session['metadata']['cart_items'])
+                print(f"[CREATE VENTA] Items encontrados: {len(cart_items)} items")
+            except Exception as e:
+                print(f"[CREATE VENTA] Error parseando metadatos: {e}")
+        
+        if not cart_items:
+            print(f"[CREATE VENTA] No hay items para crear venta")
+            return None
+        
+        # Obtener usuario basado en el email de Stripe
+        usuario = None
+        customer_email = stripe_session.get('customer_details', {}).get('email')
+        customer_name = stripe_session.get('customer_details', {}).get('name')
+        
+        if customer_email:
+            from usuarios.models import Usuario, Rol
+            try:
+                # Intentar obtener usuario existente por email
+                usuario = Usuario.objects.get(email=customer_email)
+                print(f"[CREATE VENTA] Usuario encontrado: {usuario.nombre}")
+            except Usuario.DoesNotExist:
+                # Crear usuario automático si no existe
+                print(f"[CREATE VENTA] Creando usuario automático para: {customer_email}")
+                try:
+                    # Obtener rol Cliente (o crear si no existe)
+                    rol_cliente, _ = Rol.objects.get_or_create(nombre='Cliente')
+                    
+                    # Crear usuario con los datos de Stripe
+                    nombre = customer_name or customer_email.split('@')[0]
+                    usuario = Usuario.objects.create(
+                        email=customer_email,
+                        nombre=nombre,
+                        rol=rol_cliente,
+                        is_active=True
+                    )
+                    print(f"[CREATE VENTA] Usuario creado automáticamente: {usuario.nombre} ({usuario.email})")
+                except Exception as e:
+                    print(f"[CREATE VENTA] Error creando usuario automático: {e}")
+                    usuario = None
+        
+        # Crear la Venta (con o sin usuario)
+        total_venta = Decimal(str(amount_bob)) if amount_bob else Decimal('0')
+        
+        venta = Venta.objects.create(
+            usuario=usuario,
+            total=total_venta,
+            metodo_pago='Stripe',
+            estado='pagado',  # Siempre pagado porque viene del webhook exitoso
+            creado_en=timezone.now()
+        )
+        
+        print(f"[CREATE VENTA] Venta creada: ID={venta.id}, Total={total_venta}, Usuario={usuario.nombre if usuario else 'Anónimo'}")
+        
+        # Crear VentaDetalle para cada item
+        for item in cart_items:
+            try:
+                product_id = item.get('id')
+                product_name = item.get('nombre') or item.get('name')
+                quantity = item.get('cantidad') or item.get('quantity', 1)
+                price = Decimal(str(item.get('precio', 0)))
+                
+                # Obtener el producto
+                if product_id:
+                    producto = Producto.objects.get(id=product_id)
+                else:
+                    producto = Producto.objects.filter(nombre__icontains=product_name).first()
+                
+                if producto:
+                    subtotal = price * quantity
+                    detalle = VentaDetalle.objects.create(
+                        venta=venta,
+                        producto=producto,
+                        cantidad=quantity,
+                        precio_unitario=price,
+                        subtotal=subtotal
+                    )
+                    print(f"[CREATE VENTA] Detalle creado: {producto.nombre} x{quantity} = {subtotal}")
+                else:
+                    print(f"[CREATE VENTA] Producto no encontrado: {product_name}")
+            except Exception as e:
+                print(f"[CREATE VENTA] Error creando detalle: {e}")
+        
+        print(f"[CREATE VENTA] Venta registrada exitosamente: {venta.id}")
+        return venta
+        
+    except Exception as e:
+        print(f"[CREATE VENTA] Error en create_venta_from_stripe_session: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def process_payment_stock(session_id, data_object):
@@ -272,10 +382,22 @@ def process_payment_stock_from_session(session_id):
 def pago_exito(request):
     session_id = request.GET.get('session_id')
     
-    # Procesar el stock cuando el usuario llega a la página de éxito
+    # Procesar el stock y crear venta cuando el usuario llega a la página de éxito
     if session_id:
         print(f"[EXITO] Procesando pago exitoso para session: {session_id}")
+        # Procesar stock
         process_payment_stock_from_session(session_id)
+        
+        # Obtener cantidad y crear venta
+        try:
+            stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+            stripe_session = stripe.checkout.Session.retrieve(session_id)
+            amount_bob = stripe_session.get('amount_total') or 0
+            if amount_bob:
+                amount_bob = Decimal(str(amount_bob)) / 100  # Convertir de centavos
+            create_venta_from_stripe_session(session_id, amount_bob)
+        except Exception as e:
+            print(f"[EXITO] Error creando venta: {e}")
     
     return render(request, 'pagos/exito.html', {'session_id': session_id})
 
@@ -315,6 +437,15 @@ def stripe_webhook(request):
                 
                 # Procesar la actualización de stock después del pago
                 process_payment_stock(session_id, data_object)
+                
+                # Crear venta en el sistema
+                try:
+                    amount_bob = data_object.get('amount_total') or 0
+                    if amount_bob:
+                        amount_bob = Decimal(str(amount_bob)) / 100  # Convertir de centavos
+                    create_venta_from_stripe_session(session_id, amount_bob)
+                except Exception as e:
+                    print(f"[WEBHOOK VENTA] Error creando venta: {e}")
             except Payment.DoesNotExist:
                 try:
                     Payment.objects.create(
@@ -326,6 +457,15 @@ def stripe_webhook(request):
                     )
                     # Procesar la actualización de stock
                     process_payment_stock(session_id, data_object)
+                    
+                    # Crear venta en el sistema
+                    try:
+                        amount_bob = data_object.get('amount_total') or 0
+                        if amount_bob:
+                            amount_bob = Decimal(str(amount_bob)) / 100  # Convertir de centavos
+                        create_venta_from_stripe_session(session_id, amount_bob)
+                    except Exception as e:
+                        print(f"[WEBHOOK VENTA] Error creando venta: {e}")
                 except Exception:
                     pass
 

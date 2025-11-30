@@ -196,6 +196,67 @@
                 </div>
             </div>
         </div>
+
+        <!-- Historial de Ventas del Día -->
+        <div class="row g-4 mt-2">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">📋 Historial de Ventas (Hoy)</h5>
+                        <span class="badge bg-success">{{ total_ventas_hoy }} compras</span>
+                    </div>
+                    <div class="card-body">
+                        {% if historial_ventas %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Hora</th>
+                                            <th>Cliente</th>
+                                            <th>Productos</th>
+                                            <th>Método Pago</th>
+                                            <th>Estado</th>
+                                            <th class="text-end">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for venta in historial_ventas %}
+                                            <tr>
+                                                <td><strong>{{ venta.hora }}</strong></td>
+                                                <td>
+                                                    <div><strong>{{ venta.cliente }}</strong></div>
+                                                    <small class="text-muted">{{ venta.email }}</small>
+                                                </td>
+                                                <td>
+                                                    <small>
+                                                        {% for detalle in venta.detalles %}
+                                                            <div>{{ detalle.cantidad }}x {{ detalle.producto }}</div>
+                                                        {% endfor %}
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info">{{ venta.metodo_pago }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge {% if venta.estado == 'pagado' %}bg-success{% elif venta.estado == 'pendiente' %}bg-warning{% elif venta.estado == 'cancelado' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                        {{ venta.estado|upper }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-end"><strong>Bs. {{ venta.total|floatformat:2 }}</strong></td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info" role="alert">
+                                ℹ️ No hay ventas registradas hoy
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- TAB INVENTARIO -->
