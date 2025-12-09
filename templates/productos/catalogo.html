@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+{% load producto_tags %}
 {% block title %}Catálogo | Adonai{% endblock %}
 
 {% block content %}
@@ -53,11 +55,15 @@
     {% for p in productos %}
       <div class="col-12 col-sm-6 col-md-4 col-lg-3">
         <div class="card h-100 product-card">
-          {% if p.imagen %}
-            <img src="{{ p.imagen.url }}" class="card-img-top" style="object-fit: cover; object-position: center; width: 100%; height: 200px; display: block;" alt="{{ p.nombre }}">
-          {% else %}
-            <div class="bg-light d-flex align-items-center justify-content-center" style="height:200px">Sin imagen</div>
-          {% endif %}
+          {% with imagen_ruta=p.nombre|get_imagen_producto %}
+            {% if imagen_ruta %}
+              <img src="{% static imagen_ruta %}" class="card-img-top" style="object-fit: cover; object-position: center; width: 100%; height: 200px; display: block;" alt="{{ p.nombre }}">
+            {% elif p.imagen %}
+              <img src="{{ p.imagen.url }}" class="card-img-top" style="object-fit: cover; object-position: center; width: 100%; height: 200px; display: block;" alt="{{ p.nombre }}">
+            {% else %}
+              <div class="bg-light d-flex align-items-center justify-content-center" style="height:200px">Sin imagen</div>
+            {% endif %}
+          {% endwith %}
           <div class="card-body">
             <h5 class="card-title mb-1">{{ p.nombre }}</h5>
             <div class="small text-muted mb-2">{{ p.categoria.nombre }}</div>
@@ -84,9 +90,13 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              {% if p.imagen %}
-                <img src="{{ p.imagen.url }}" class="img-fluid" alt="{{ p.nombre }}">
-              {% endif %}
+              {% with imagen_ruta=p.nombre|get_imagen_producto %}
+                {% if imagen_ruta %}
+                  <img src="{% static imagen_ruta %}" class="img-fluid" alt="{{ p.nombre }}">
+                {% elif p.imagen %}
+                  <img src="{{ p.imagen.url }}" class="img-fluid" alt="{{ p.nombre }}">
+                {% endif %}
+              {% endwith %}
               <p><strong>Categoría:</strong> {{ p.categoria.nombre }}</p>
               <p><strong>Descripción:</strong> {{ p.descripcion }}</p>
               <p><strong>Precio:</strong> Bs. {{ p.precio }}</p>
