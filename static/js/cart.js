@@ -7,9 +7,13 @@ function saveCart() {
 }
 
 function updateCartCount() {
-  const el = document.getElementById('cart-count');
-  if (!el) return;
-  try { el.textContent = String(cart.length); } catch (e) {}
+  // Actualizar contador del header
+  const el1 = document.getElementById('cart-count');
+  if (el1) el1.textContent = String(cart.length);
+  
+  // Actualizar contador del catálogo
+  const el2 = document.getElementById('cart-count-catalogo');
+  if (el2) el2.textContent = String(cart.length);
 }
 
 function validateQuantity(value){
@@ -138,6 +142,9 @@ function addToCart(productId, productName, productPrice, quantity, cuponOrInputI
   } else {
     console.log('Producto añadido al carrito');
   }
+
+  // Actualizar la vista del carrito si está visible
+  showCart();
 }
 
 function showCart(){

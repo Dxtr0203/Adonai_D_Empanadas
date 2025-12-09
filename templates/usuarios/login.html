@@ -1,113 +1,456 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión</title>
+    <title>Iniciar sesión - Adonai</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
-            color: #333;
+            box-sizing: border-box;
         }
-        .container {
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Fondo con panal de abeja */
+        .honeycomb-background {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            max-width: 400px;
-            margin: 100px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+            overflow: hidden;
         }
-        h2 {
+
+        .honeycomb-item {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            animation: smoothFadeInOut 8s ease-in-out infinite;
+            transition: left 1.5s ease-in-out, top 1.5s ease-in-out;
+        }
+
+        .honeycomb-item:nth-child(1) { animation-delay: 0s; }
+        .honeycomb-item:nth-child(2) { animation-delay: 0.6s; }
+        .honeycomb-item:nth-child(3) { animation-delay: 1.2s; }
+        .honeycomb-item:nth-child(4) { animation-delay: 1.8s; }
+        .honeycomb-item:nth-child(5) { animation-delay: 2.4s; }
+        .honeycomb-item:nth-child(6) { animation-delay: 3s; }
+        .honeycomb-item:nth-child(7) { animation-delay: 3.6s; }
+        .honeycomb-item:nth-child(8) { animation-delay: 4.2s; }
+        .honeycomb-item:nth-child(9) { animation-delay: 4.8s; }
+        .honeycomb-item:nth-child(10) { animation-delay: 5.4s; }
+        .honeycomb-item:nth-child(11) { animation-delay: 6s; }
+        .honeycomb-item:nth-child(12) { animation-delay: 6.6s; }
+        .honeycomb-item:nth-child(13) { animation-delay: 0.3s; }
+        .honeycomb-item:nth-child(14) { animation-delay: 0.9s; }
+        .honeycomb-item:nth-child(15) { animation-delay: 1.5s; }
+        .honeycomb-item:nth-child(16) { animation-delay: 2.1s; }
+        .honeycomb-item:nth-child(17) { animation-delay: 2.7s; }
+        .honeycomb-item:nth-child(18) { animation-delay: 3.3s; }
+        .honeycomb-item:nth-child(19) { animation-delay: 3.9s; }
+        .honeycomb-item:nth-child(20) { animation-delay: 4.5s; }
+
+        @keyframes smoothFadeInOut {
+            0% {
+                opacity: 0;
+            }
+            15% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 0.8;
+            }
+            85% {
+                opacity: 0.7;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* Contenedor principal */
+        .login-wrapper {
+            position: relative;
+            z-index: 10;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 420px;
+            padding: 50px 40px;
+            animation: slideUp 0.6s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
             text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .login-header h2 {
+            font-size: 32px;
             color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: 700;
         }
+
+        .login-header p {
+            color: #7f8c8d;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Alertas de error mejoradas */
+        .error-alert {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            animation: slideInError 0.4s ease, pulse-error 1s ease 2s;
+            box-shadow: 0 8px 16px rgba(255, 107, 107, 0.3);
+            border-left: 4px solid #ff4757;
+        }
+
+        .error-alert::before {
+            content: "⚠️";
+            margin-right: 12px;
+            font-size: 18px;
+        }
+
+        @keyframes slideInError {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse-error {
+            0%, 100% {
+                box-shadow: 0 8px 16px rgba(255, 107, 107, 0.3);
+            }
+            50% {
+                box-shadow: 0 8px 30px rgba(255, 107, 107, 0.6);
+            }
+        }
+
+        .error-alert p {
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        /* Grupos de formulario */
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 24px;
         }
+
         .form-group label {
-            font-weight: bold;
+            font-weight: 600;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
+
         .form-group input {
             width: 100%;
-            padding: 10px;
+            padding: 14px 16px;
             font-size: 14px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
+            border-radius: 10px;
+            border: 2px solid #ecf0f1;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            color: #2c3e50;
         }
+
+        .form-group input::placeholder {
+            color: #bdc3c7;
+        }
+
         .form-group input:focus {
-            border-color: #3498db;
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
         }
+
+        .form-group input:hover {
+            border-color: #bdc3c7;
+        }
+
+        /* Botón de envío */
         .btn-submit {
             width: 100%;
-            padding: 10px;
-            background-color: #3498db;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 10px;
             font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            margin-top: 10px;
         }
+
         .btn-submit:hover {
-            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4);
         }
-        .error-message {
-            color: red;
-            font-size: 14px;
-            margin-bottom: 10px;
+
+        .btn-submit:active {
+            transform: translateY(0);
         }
+
+        /* Enlaces y extras */
+        .login-extras {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            font-size: 12px;
+        }
+
+        .login-extras a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            font-weight: 500;
+        }
+
+        .login-extras a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
         .register-link {
             text-align: center;
-            margin-top: 15px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .register-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .register-link a:hover {
+            color: #764ba2;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                max-width: 90%;
+                padding: 35px 25px;
+            }
+
+            .login-header h2 {
+                font-size: 26px;
+            }
+
+            .honeycomb-item {
+                width: 100px;
+                height: 100px;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Fondo animado con panal de abeja -->
+    <div class="honeycomb-background" id="honeycombBg"></div>
 
-    <div class="container">
-        <h2>Iniciar sesión</h2>
-
-        <!-- Mostrar los errores de autenticación -->
-        {% if form.errors %}
-            <div class="error-message">
-                <p>Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.</p>
+    <div class="login-wrapper">
+        <div class="container">
+            <div class="login-header">
+                <h2>🐾 Adonai</h2>
+                <p>Iniciar sesión en tu cuenta</p>
             </div>
-        {% endif %}
 
-        <!-- Mostrar los mensajes de otros posibles errores, como bloqueo de intentos fallidos -->
-        {% if messages %}
-            <div class="error-message">
+            <!-- Mostrar los errores de autenticación -->
+            {% if form.errors %}
+                <div class="error-alert">
+                    <p>Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.</p>
+                </div>
+            {% endif %}
+
+            <!-- Mostrar los mensajes de otros posibles errores -->
+            {% if messages %}
                 {% for message in messages %}
-                    <p>{{ message }}</p>
+                    <div class="error-alert">
+                        <p>{{ message }}</p>
+                    </div>
                 {% endfor %}
-            </div>
-        {% endif %}
+            {% endif %}
 
-        <!-- Formulario de login -->
-        <form method="post">
-            {% csrf_token %}
-            
-            <div class="form-group">
-                <label for="id_username">Usuario:</label>
-                <input type="text" name="username" id="id_username" class="form-control" required autofocus>
-            </div>
-            
-            <div class="form-group">
-                <label for="id_password">Contraseña:</label>
-                <input type="password" name="password" id="id_password" class="form-control" required>
-            </div>
-            
-            <button type="submit" class="btn-submit">Iniciar sesión</button>
-        </form>
+            <!-- Formulario de login -->
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="id_username">Usuario:</label>
+                    <input type="text" name="username" id="id_username" class="form-control" placeholder="Ingresa tu usuario" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_password">Contraseña:</label>
+                    <input type="password" name="password" id="id_password" class="form-control" placeholder="Ingresa tu contraseña" required>
+                </div>
+                
+                <button type="submit" class="btn-submit">Iniciar Sesión</button>
+            </form>
 
-      
-
+            <div class="register-link">
+                <p>¿No tienes cuenta? <a href="/usuarios/register/">Regístrate aquí</a></p>
+            </div>
+        </div>
     </div>
 
+    <script>
+        // Imágenes disponibles en static/img/Imagenes
+        const images = [
+            '/static/img/Imagenes/Alfombra Olfativa.png',
+            '/static/img/Imagenes/Alimento Pez tropical.png',
+            '/static/img/Imagenes/Antipulgas Perro .png',
+            '/static/img/Imagenes/Arena Gato Premium 15kg.png',
+            '/static/img/Imagenes/Arnes de Gato.png',
+            '/static/img/Imagenes/Bebedero Gato Automatico.png',
+            '/static/img/Imagenes/Cepillo Perro.png',
+            '/static/img/Imagenes/Clicker Avanzado.png',
+            '/static/img/Imagenes/Clicker Basico.png',
+            '/static/img/Imagenes/Collar perro Pequeño .png',
+            '/static/img/Imagenes/Comedero Perro Automatico.png',
+            '/static/img/Imagenes/Comida de cachorro .png',
+            '/static/img/Imagenes/Comida de gato adulto .png',
+            '/static/img/Imagenes/Comida de gato senior.png',
+            '/static/img/Imagenes/Comida de perro adulto .png',
+            '/static/img/Imagenes/Cono de agilidad .png',
+            '/static/img/Imagenes/Correa Extensible Perro .png',
+            '/static/img/Imagenes/Cuerda de saltar para perro .png',
+            '/static/img/Imagenes/Desinfectante Jaulas.png',
+            '/static/img/Imagenes/Disfraz Pirata Perro .png',
+            '/static/img/Imagenes/Disfraz Princesa Gato .png',
+            '/static/img/Imagenes/Huesito de goma rojo.png',
+            '/static/img/Imagenes/Hueso de goma grande.png',
+            '/static/img/Imagenes/Juguete interactivo gato.png',
+            '/static/img/Imagenes/Mochila Gato.png',
+            '/static/img/Imagenes/Pastillas Digestivas Perro.png',
+            '/static/img/Imagenes/Pelota de goma con Sonida.png',
+            '/static/img/Imagenes/Pelota de tenis para perro.png',
+            '/static/img/Imagenes/Pluma con varita para gato.png',
+            '/static/img/Imagenes/Raton con plumas.png',
+            '/static/img/Imagenes/Shampoo Gato.png',
+            '/static/img/Imagenes/Shampoo Perro.png',
+            '/static/img/Imagenes/Silbato Entrenamiento Perro .png',
+            '/static/img/Imagenes/snack gato 300g.png',
+            '/static/img/Imagenes/Snack perro hueso 500g.png',
+            '/static/img/Imagenes/Spray Calmante Gato.png',
+            '/static/img/Imagenes/Sueter Perro Invierno.png',
+            '/static/img/Imagenes/Toallitas Higienicas Gato .png',
+            '/static/img/Imagenes/Transportadora Gato Pequeña.png',
+            '/static/img/Imagenes/Transportadora Perro Mediano.png',
+            '/static/img/Imagenes/Vitamina Gato Adulto.png'
+        ];
+
+        function initHoneycomb() {
+            const honeycombBg = document.getElementById('honeycombBg');
+            
+            // Crear 20 elementos de panal de abeja distribuidos aleatoriamente
+            for (let i = 0; i < 20; i++) {
+                const item = document.createElement('div');
+                item.className = 'honeycomb-item';
+                
+                // Posicionar aleatoriamente en toda la pantalla
+                const randomX = Math.random() * (window.innerWidth - 150);
+                const randomY = Math.random() * (window.innerHeight - 150);
+                
+                item.style.left = randomX + 'px';
+                item.style.top = randomY + 'px';
+                
+                // Asignar imagen aleatoria
+                const randomImage = images[Math.floor(Math.random() * images.length)];
+                item.style.backgroundImage = `url('${randomImage}')`;
+                
+                // Cambiar posición e imagen cada 8 segundos (duración de la animación)
+                setInterval(() => {
+                    // Cambiar posición aleatoriamente
+                    const newRandomX = Math.random() * (window.innerWidth - 150);
+                    const newRandomY = Math.random() * (window.innerHeight - 150);
+                    
+                    item.style.left = newRandomX + 'px';
+                    item.style.top = newRandomY + 'px';
+                    
+                    // Cambiar imagen aleatoriamente
+                    const newRandomImage = images[Math.floor(Math.random() * images.length)];
+                    item.style.backgroundImage = `url('${newRandomImage}')`;
+                }, 8000);
+                
+                honeycombBg.appendChild(item);
+            }
+            
+            // Reajustar posiciones si se redimensiona la ventana
+            window.addEventListener('resize', () => {
+                const items = document.querySelectorAll('.honeycomb-item');
+                items.forEach(item => {
+                    const randomX = Math.random() * (window.innerWidth - 150);
+                    const randomY = Math.random() * (window.innerHeight - 150);
+                    item.style.left = randomX + 'px';
+                    item.style.top = randomY + 'px';
+                });
+            });
+        }
+
+        // Esperar a que el DOM esté listo
+        document.addEventListener('DOMContentLoaded', initHoneycomb);
+    </script>
 </body>
 </html>
