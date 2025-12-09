@@ -13,6 +13,7 @@ from django.urls import reverse_lazy
 from django import forms
 from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse
+from django.db import models
 
 from .models import Usuario
 from .forms import UsuarioForm, PasswordChangeForm, ClientePasswordChangeForm
@@ -262,3 +263,157 @@ def custom_logout(request):
     logout(request)
     messages.success(request, "Has cerrado sesión correctamente.")
     return redirect('inicio')
+
+
+# ======================
+# RECUPERACIÓN DE CONTRASEÑA
+# ======================
+def recovery_verify(request):
+    """Verifica usuario y teléfono para recuperación de contraseña."""
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            username = data.get('username', '').strip()
+            phone = data.get('phone', '').strip()
+
+            # Buscar usuario por nombre o email
+            usuario = Usuario.objects.filter(
+                models.Q(nombre__icontains=username) | 
+                models.Q(email__icontains=username)
+            ).first()
+
+            if not usuario:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Usuario no encontrado.'
+                })
+
+            # El teléfono siempre será 75257525 para propósitos de demostración
+            # En producción, verificarías que coincida con el teléfono registrado
+            request.session['recovery_username'] = username
+            request.session['recovery_phone'] = '75257525'  # Teléfono fijo para la demostración
+            request.session['recovery_user_id'] = usuario.id
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Usuario verificado. Código de 6 dígitos enviado al teléfono.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+    return JsonResponse({'success': False, 'message': 'Método no permitido.'})
+
+
+def recovery_verify_code(request):
+    """Verifica el código de recuperación y cambia la contraseña."""
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            code = data.get('code', '').strip()
+            password = data.get('password', '').strip()
+            username = data.get('username', '').strip()
+
+            # Código predeterminado: QWE123
+            RECOVERY_CODE = 'QWE123'
+            
+            if code != RECOVERY_CODE:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Código inválido. El código correcto es QWE123.'
+                })
+
+            # Buscar usuario
+            usuario = Usuario.objects.filter(
+                models.Q(nombre__icontains=username) | 
+                models.Q(email__icontains=username)
+            ).first()
+
+            if not usuario:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Usuario no encontrado.'
+                })
+
+            # Cambiar contraseña en tabla Usuario
+            usuario.password = make_password(password)
+            usuario.save(update_fields=['password'])
+
+            # Cambiar contraseña en auth.User
+            auth_user = User.objects.filter(email__iexact=usuario.email).first()
+            if auth_user:
+                auth_user.set_password(password)
+                auth_user.save()
+
+            # Limpiar sesión
+            if 'recovery_username' in request.session:
+                del request.session['recovery_username']
+            if 'recovery_phone' in request.session:
+                del request.session['recovery_phone']
+            if 'recovery_user_id' in request.session:
+                del request.session['recovery_user_id']
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Contraseña actualizada correctamente.'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+    return JsonResponse({'success': False, 'message': 'Método no permitido.'})
+
+
+def recovery_verify_code_only(request):
+    """Verifica solo el código (sin cambiar contraseña) y crea sesión temporal."""
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            code = data.get('code', '').strip()
+            username = data.get('username', '').strip()
+
+            # Código predeterminado: QWE123
+            RECOVERY_CODE = 'QWE123'
+            
+            if code != RECOVERY_CODE:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Código inválido. El código correcto es QWE123.'
+                })
+
+            # Buscar usuario
+            usuario = Usuario.objects.filter(
+                models.Q(nombre__icontains=username) | 
+                models.Q(email__icontains=username)
+            ).first()
+
+            if not usuario:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Usuario no encontrado.'
+                })
+
+            # Iniciar sesión del usuario (para que acceda al perfil)
+            auth_user = User.objects.filter(email__iexact=usuario.email).first()
+            if auth_user:
+                # Crear sesión manualmente
+                from django.contrib.auth import login as django_login
+                # Esto se hará desde el frontend redireccionando, así que solo confirmamos
+                request.session['recovery_user_email'] = auth_user.email
+                request.session.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Código verificado. Redirigiendo al perfil...'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': str(e)
+            })
+    return JsonResponse({'success': False, 'message': 'Método no permitido.'})

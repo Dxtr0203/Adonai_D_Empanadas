@@ -287,6 +287,98 @@
             color: #764ba2;
         }
 
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 420px;
+            width: 90%;
+            position: relative;
+            animation: slideDown 0.4s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: #2c3e50;
+        }
+
+        .modal-content h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .modal-content p {
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+
+        .btn-secondary {
+            width: 100%;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(243, 156, 18, 0.4);
+        }
+
         /* Responsive */
         @media (max-width: 600px) {
             .container {
@@ -349,9 +441,57 @@
                 <button type="submit" class="btn-submit">Iniciar Sesión</button>
             </form>
 
+            <div class="login-extras">
+                <a href="#" onclick="openRecoveryModal(event)">¿Olvidaste tu contraseña? Recupérala</a>
+            </div>
+
             <div class="register-link">
                 <p>¿No tienes cuenta? <a href="/usuarios/register/">Regístrate aquí</a></p>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal de Recuperación de Contraseña - Paso 1: Solicitar Usuario y Teléfono -->
+    <div id="recoveryModal1" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeRecoveryModal()">&times;</span>
+            <h2>Recuperar Contraseña</h2>
+            <p>Ingresa tu usuario y número de teléfono para recuperar tu contraseña.</p>
+            <form id="recoveryForm1">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="recovery_username">Usuario:</label>
+                    <input type="text" id="recovery_username" name="username" class="form-control" placeholder="Ingresa tu usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="recovery_phone">Número de teléfono:</label>
+                    <input type="text" id="recovery_phone" name="phone" class="form-control" placeholder="7525-7525 ó (591) 75257525" required>
+                </div>
+                <button type="button" onclick="submitRecoveryStep1()" class="btn-submit">Recuperar</button>
+            </form>
+            <div id="recovery-error" style="display: none; color: #ff6b6b; margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Recuperación de Contraseña - Paso 2: Verificar Código -->
+    <div id="recoveryModal2" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeRecoveryModal()">&times;</span>
+            <h2>Código de Verificación</h2>
+            <p>Se envió un código de 6 dígitos al número de celular <strong id="display-phone"></strong></p>
+            <form id="recoveryForm2">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="recovery_code">Código de 6 dígitos:</label>
+                    <input type="text" id="recovery_code" name="code" class="form-control" placeholder="Ingresa el código" maxlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label for="recovery_password">Nueva Contraseña:</label>
+                    <input type="password" id="recovery_password" name="password" class="form-control" placeholder="Ingresa tu nueva contraseña" required>
+                </div>
+                <button type="button" onclick="submitRecoveryStep2()" class="btn-submit">Listo</button>
+            </form>
+            <div id="recovery-error2" style="display: none; color: #ff6b6b; margin-top: 15px;"></div>
         </div>
     </div>
 
@@ -451,6 +591,121 @@
 
         // Esperar a que el DOM esté listo
         document.addEventListener('DOMContentLoaded', initHoneycomb);
+
+        // ========== FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA ==========
+        let recoveryData = {};
+
+        function openRecoveryModal(event) {
+            event.preventDefault();
+            document.getElementById('recoveryModal1').style.display = 'flex';
+            document.getElementById('recovery_username').focus();
+        }
+
+        function closeRecoveryModal() {
+            document.getElementById('recoveryModal1').style.display = 'none';
+            document.getElementById('recoveryModal2').style.display = 'none';
+            document.getElementById('recoveryForm1').reset();
+            document.getElementById('recoveryForm2').reset();
+            document.getElementById('recovery-error').style.display = 'none';
+            document.getElementById('recovery-error2').style.display = 'none';
+            recoveryData = {};
+        }
+
+        function submitRecoveryStep1() {
+            const username = document.getElementById('recovery_username').value.trim();
+            const phone = document.getElementById('recovery_phone').value.trim();
+            const errorDiv = document.getElementById('recovery-error');
+
+            if (!username || !phone) {
+                errorDiv.textContent = 'Por favor completa todos los campos.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            // Enviar al servidor
+            fetch('/usuarios/recovery/verify/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ username: username, phone: phone })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    recoveryData.username = username;
+                    recoveryData.phone = phone;
+                    document.getElementById('display-phone').textContent = phone;
+                    document.getElementById('recoveryModal1').style.display = 'none';
+                    document.getElementById('recoveryModal2').style.display = 'flex';
+                    document.getElementById('recovery_code').focus();
+                } else {
+                    errorDiv.textContent = data.message || 'Error al verificar usuario.';
+                    errorDiv.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                errorDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+                errorDiv.style.display = 'block';
+                console.error('Error:', error);
+            });
+        }
+
+        function submitRecoveryStep2() {
+            const code = document.getElementById('recovery_code').value.trim();
+            const password = document.getElementById('recovery_password').value.trim();
+            const errorDiv = document.getElementById('recovery-error2');
+
+            if (!code || !password) {
+                errorDiv.textContent = 'Por favor completa todos los campos.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            // Enviar al servidor
+            fetch('/usuarios/recovery/verify-code/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ 
+                    username: recoveryData.username, 
+                    code: code,
+                    password: password 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Cambiar contraseña completado
+                    closeRecoveryModal();
+                    alert('¡Contraseña actualizada correctamente! Por favor inicia sesión.');
+                    location.reload();
+                } else {
+                    errorDiv.textContent = data.message || 'Código inválido.';
+                    errorDiv.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                errorDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+                errorDiv.style.display = 'block';
+                console.error('Error:', error);
+            });
+        }
+
+        // Cerrar modal al hacer clic fuera de él
+        window.onclick = function(event) {
+            const modal1 = document.getElementById('recoveryModal1');
+            const modal2 = document.getElementById('recoveryModal2');
+            if (event.target === modal1) {
+                modal1.style.display = 'none';
+            }
+            if (event.target === modal2) {
+                modal2.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>

@@ -23,6 +23,10 @@ urlpatterns = [
     # Ruta para forzar el cambio de contraseña
    path('force-password-change/', views.force_password_change, name='force_password_change'),
 
+    # Rutas de recuperación de contraseña (modal)
+    path('recovery/verify/', views.recovery_verify, name='recovery_verify'),
+    path('recovery/verify-code/', views.recovery_verify_code, name='recovery_verify_code'),
+    path('recovery/verify-code-only/', views.recovery_verify_code_only, name='recovery_verify_code_only'),
 
     # Rutas de restablecimiento de contraseña (flujo de email)
     path('password_reset/', auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html'), name='password_reset'),
